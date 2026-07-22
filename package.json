@@ -804,7 +804,7 @@
 		"desktop:typecheck": "tsc -p tsconfig.desktop.json --noEmit",
 		"desktop:build:host": "tsc -p tsconfig.desktop.json",
 		"desktop:build:renderer": "vite build --config vite.desktop.config.ts --mode production",
-		"desktop:build": "npm run desktop:build:renderer && npm run desktop:build:host",
+		"desktop:build": "npm run build && npm run desktop:build:renderer && npm run desktop:build:host",
 		"benchmark:desktop": "npm run desktop:build && node scripts/performance/run-desktop-benchmark.mjs",
 		"benchmark:desktop:check": "npm run desktop:build && node scripts/performance/run-desktop-benchmark.mjs --enforce",
 		"desktop:dev": "npm run desktop:build:host && concurrently -k -n renderer,host,app \"vite --config vite.desktop.config.ts --mode development\" \"tsc -p tsconfig.desktop.json --watch --preserveWatchOutput\" \"wait-on http://127.0.0.1:5740/index.desktop.html && cross-env OFFICE_DESKTOP_DEV_URL=http://127.0.0.1:5740/index.desktop.html electron out/desktop/main/index.js\"",

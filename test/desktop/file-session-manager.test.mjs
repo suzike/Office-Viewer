@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, open, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, open, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -148,9 +148,9 @@ test('FileSessionManager restricts Markdown resources and WikiLinks to the docum
   })
 
   const [source] = await manager.registerPaths([sourcePath])
-  assert.equal(await manager.resolveDocumentResource(source.id, 'pixel.png'), imagePath)
+  assert.equal(await manager.resolveDocumentResource(source.id, 'pixel.png'), await realpath(imagePath))
   const linked = await manager.resolveMarkdownLink(source.id, 'wiki:Linked%20Note#Section')
-  assert.equal(linked?.path, linkedPath)
+  assert.equal(linked?.path, await realpath(linkedPath))
   assert.equal(await manager.resolveMarkdownLink(source.id, 'wiki:Missing'), null)
   await assert.rejects(() => manager.resolveDocumentResource(source.id, '../outside.md'))
   await assert.rejects(() => manager.resolveMarkdownLink(source.id, 'wiki:../outside'))
