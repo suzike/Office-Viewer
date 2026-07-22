@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "benchmark": "office-viewer-real-desktop-performance",
+  "generatedAt": "2026-07-22T08:56:19.910Z",
+  "runId": "2026-07-22T08-56-09-402Z",
+  "source": {
+    "commit": "45bad77d7d9a735b5c7fb394327ae60c26684bfe",
+    "dirty": true
+  },
+  "environment": {
+    "hostname": "Smoon",
+    "platform": "win32",
+    "osRelease": "10.0.26200",
+    "architecture": "x64",
+    "cpu": "Intel(R) Core(TM) i9-14900HX",
+    "logicalCpuCount": 32,
+    "totalMemoryMiB": 32491.87,
+    "freeMemoryAtReportMiB": 5326.2,
+    "nodeVersion": "v25.2.1",
+    "electronVersion": "43.1.1",
+    "runtime": "packaged-win-unpacked",
+    "executable": "E:\\Agentic_Engineering\\Codex\\Office-Viewer\\dist\\desktop\\win-unpacked\\Office Viewer.exe"
+  },
+  "isolation": {
+    "userDataDirectory": "temporary-and-deleted-after-run",
+    "externalLlmCalled": false,
+    "aiTransport": "127.0.0.1 deterministic NDJSON mock through production AI IPC/service path",
+    "fixture": "generated real XLSX workbooks, 480 data rows × 12 columns each"
+  },
+  "configuration": {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "switchIterations": 6,
+    "mockFirstChunkDelayMs": 60,
+    "memorySampleIntervalMs": 100
+  },
+  "metrics": {
+    "coldStart": {
+      "unit": "ms",
+      "start": "immediately before spawning the primary Electron process with an empty temporary profile",
+      "end": "second requestAnimationFrame after the visible .desktop-shell is attached",
+      "samples": [
+        2665.43
+      ],
+      "value": 2665.43
+    },
+    "firstDocumentOpen": {
+      "unit": "ms",
+      "start": "immediately before spawning a second instance that hands a real XLSX path to the primary instance",
+      "end": "active tab, spreadsheet surface, expected A1 formula-bar value, and two animation frames are ready",
+      "samples": [
+        1452.87
+      ],
+      "value": 1452.87
+    },
+    "tabSwitch": {
+      "unit": "ms",
+      "start": "renderer performance.now immediately before clicking the target document tab",
+      "end": "target tab, spreadsheet surface, target A1 value, and two animation frames are ready",
+      "samples": [
+        218.3,
+        178.5,
+        211.5,
+        237.9,
+        198,
+        200.3
+      ],
+      "p50": 200.3,
+      "p95": 237.9,
+      "min": 178.5,
+      "max": 237.9,
+      "comparisonValue": "p95"
+    },
+    "aiFirstToken": {
+      "unit": "ms",
+      "start": "renderer performance.now immediately before clicking Send",
+      "end": "first non-empty assistant text mutation reaches the renderer",
+      "samples": [
+        312.5
+      ],
+      "value": 312.5,
+      "note": "Includes workbook extraction, IPC, production provider request, and a fixed 60 ms mock-model delay."
+    },
+    "memory": {
+      "unit": "MiB working set",
+      "start": "sampler begins immediately after the primary Electron process is spawned",
+      "end": "after the final streamed AI response is rendered",
+      "sampleIntervalMs": 100,
+      "observedSampleIntervalMs": {
+        "p50": 464,
+        "p95": 869,
+        "min": 205,
+        "max": 869
+      },
+      "sampleCount": 20,
+      "mainProcessPeakMb": 208.32,
+      "rendererProcessesPeakMb": 167.4,
+      "totalProcessTreePeakMb": 608.5,
+      "maximumProcessCount": 4,
+      "maximumRendererCount": 1
+    }
+  },
+  "summary": {
+    "comparableValues": {
+      "coldStartMs": 2665.43,
+      "firstDocumentOpenMs": 1452.87,
+      "tabSwitchP95Ms": 237.9,
+      "aiFirstTokenMs": 312.5,
+      "mainProcessPeakMb": 208.32,
+      "rendererProcessesPeakMb": 167.4,
+      "totalProcessTreePeakMb": 608.5
+    },
+    "thresholds": {
+      "enforcement": "advisory",
+      "budgets": {
+        "coldStartMs": 8000,
+        "firstDocumentOpenMs": 8000,
+        "tabSwitchP95Ms": 2500,
+        "aiFirstTokenMs": 2000,
+        "mainProcessPeakMb": 350,
+        "rendererProcessesPeakMb": 700,
+        "totalProcessTreePeakMb": 1200
+      },
+      "allPassed": true,
+      "checks": [
+        {
+          "metric": "coldStartMs",
+          "value": 2665.43,
+          "budget": 8000,
+          "unit": "ms",
+          "passed": true
+        },
+        {
+          "metric": "firstDocumentOpenMs",
+          "value": 1452.87,
+          "budget": 8000,
+          "unit": "ms",
+          "passed": true
+        },
+        {
+          "metric": "tabSwitchP95Ms",
+          "value": 237.9,
+          "budget": 2500,
+          "unit": "ms",
+          "passed": true
+        },
+        {
+          "metric": "aiFirstTokenMs",
+          "value": 312.5,
+          "budget": 2000,
+          "unit": "ms",
+          "passed": true
+        },
+        {
+          "metric": "mainProcessPeakMb",
+          "value": 208.32,
+          "budget": 350,
+          "unit": "MiB",
+          "passed": true
+        },
+        {
+          "metric": "rendererProcessesPeakMb",
+          "value": 167.4,
+          "budget": 700,
+          "unit": "MiB",
+          "passed": true
+        },
+        {
+          "metric": "totalProcessTreePeakMb",
+          "value": 608.5,
+          "budget": 1200,
+          "unit": "MiB",
+          "passed": true
+        }
+      ]
+    },
+    "baselineComparison": null
+  },
+  "diagnostics": {
+    "memorySamplerErrors": []
+  }
+}

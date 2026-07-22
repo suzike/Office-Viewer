@@ -1,0 +1,32 @@
+name: Windows Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to publish
+        required: true
+        default: v0.5.0
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run desktop:dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          generate_release_notes: true
+          files: |
+            dist/desktop/Office Viewer Setup 0.5.0.exe
+            dist/desktop/Office Viewer 0.5.0.exe
+            dist/desktop/Office Viewer Setup 0.5.0.exe.blockmap

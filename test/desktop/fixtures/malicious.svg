@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="320" height="180" onload="window.__officeSvgExecuted = true">
+  <script>window.__officeSvgExecuted = true</script>
+  <foreignObject width="100" height="50">
+    <div xmlns="http://www.w3.org/1999/xhtml"><img src="x" onerror="window.__officeSvgExecuted = true" /></div>
+  </foreignObject>
+  <style>@import url("https://example.invalid/tracker.css"); .remote { fill: url("https://example.invalid/pixel.svg"); }</style>
+  <image href="https://example.invalid/tracker.png" width="20" height="20" />
+  <set attributeName="href" to="https://example.invalid/animated-tracker.png" begin="0s" />
+  <a xlink:href="javascript:window.__officeSvgExecuted=true"><rect width="50" height="50" fill="#f97316" /></a>
+  <defs><linearGradient id="safe-gradient"><stop offset="0" stop-color="#2563eb" /><stop offset="1" stop-color="#7c3aed" /></linearGradient></defs>
+  <rect width="320" height="180" fill="url(#safe-gradient)" />
+</svg>

@@ -1,0 +1,15 @@
+out/
+dist/
+node_modules    
+.spec-workflow/
+docs/assets/screenshots/markdown-editor.png
+docs/assets/screenshots/markdown-theme-panel.png
+.vscode-test/
+.idea/
+*.vsix
+.DS_Store
+bun.lock
+yarn.lock
+pnpm-lock.yaml
+pnpm-workspace.yaml
+test/output

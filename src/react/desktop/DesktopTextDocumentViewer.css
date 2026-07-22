@@ -1,0 +1,22 @@
+.desktop-text-viewer { height: 100%; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--paper-raised); color: var(--ink); }
+.desktop-text-toolbar { min-height: 42px; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--line); background: var(--paper); font-size: 12px; }
+.desktop-text-toolbar strong { letter-spacing: .12em; color: var(--accent); }
+.desktop-text-toolbar button, .desktop-text-toolbar select, .desktop-yaml-reference button { min-height: 28px; border: 1px solid var(--line); border-radius: 4px; padding: 0 9px; background: var(--paper-raised); color: var(--ink); }
+.desktop-text-toolbar button:not(:disabled):hover, .desktop-yaml-reference button:hover { border-color: var(--accent); }
+.desktop-text-toolbar button:disabled, .desktop-text-toolbar select:disabled { opacity: .45; }
+.desktop-text-toolbar label { display: flex; align-items: center; gap: 5px; color: var(--muted); }
+.desktop-text-toolbar__spacer { flex: 1; }
+.desktop-text-body { position: relative; min-height: 0; display: flex; overflow: hidden; }
+.desktop-text-editor { flex: 1; min-width: 0; min-height: 0; }
+.desktop-text-editor .cm-editor { height: 100%; }
+.desktop-yaml-outline { width: 236px; flex: 0 0 236px; overflow: auto; border-right: 1px solid var(--line); background: var(--paper); padding: 12px 8px 20px; }
+.desktop-yaml-outline h2 { margin: 0 7px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); }
+.desktop-yaml-outline p { margin: 12px 7px; color: var(--muted); font-size: 12px; }
+.desktop-yaml-outline ul { list-style: none; margin: 0; padding-left: 13px; }
+.desktop-yaml-outline > ul { padding-left: 0; }
+.desktop-yaml-outline button { width: 100%; border: 0; border-radius: 3px; padding: 4px 7px; background: transparent; color: var(--ink); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desktop-yaml-outline button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.desktop-yaml-reference { min-height: 32px; display: flex; align-items: center; gap: 8px; padding: 4px 12px; border-top: 1px solid var(--line); background: var(--paper); font-size: 12px; }
+.desktop-yaml-reference code { color: var(--accent); }
+.desktop-text-error { position: absolute; z-index: 4; top: 52px; left: 50%; max-width: min(680px, 80%); transform: translateX(-50%); }
+@media (max-width: 760px) { .desktop-yaml-outline { width: 176px; flex-basis: 176px; } .desktop-text-toolbar > span:not(.desktop-text-toolbar__spacer) { display: none; } }

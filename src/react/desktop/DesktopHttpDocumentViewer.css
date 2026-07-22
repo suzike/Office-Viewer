@@ -1,0 +1,149 @@
+.http-client {
+    --http-border: color-mix(in srgb, currentColor 18%, transparent);
+    --http-muted: color-mix(in srgb, currentColor 62%, transparent);
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    height: 100%;
+    min-height: 0;
+    background: var(--vscode-editor-background, #1e1e1e);
+    color: var(--vscode-editor-foreground, #d4d4d4);
+    font-family: var(--vscode-font-family, "Segoe UI", sans-serif);
+}
+
+.http-client button,
+.http-client select,
+.http-client input,
+.http-client textarea {
+    color: inherit;
+    font: inherit;
+}
+
+.http-client button,
+.http-client select,
+.http-client input[type="number"] {
+    border: 1px solid var(--http-border);
+    background: color-mix(in srgb, currentColor 7%, transparent);
+}
+
+.http-client button { padding: 4px 9px; cursor: pointer; }
+.http-client button:disabled { cursor: default; opacity: .48; }
+.http-client button:hover:not(:disabled) { background: color-mix(in srgb, #1684ff 24%, transparent); }
+
+.http-client__toolbar,
+.http-client__response-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 0 10px;
+    border-bottom: 1px solid var(--http-border);
+}
+
+.http-client__title { margin-right: auto; font-weight: 650; }
+.http-client__cancel { color: #ff7b72 !important; }
+
+.http-client__settings {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) minmax(220px, .55fr);
+    gap: 10px 18px;
+    padding: 10px;
+    border-bottom: 1px solid var(--http-border);
+    background: color-mix(in srgb, currentColor 4%, transparent);
+}
+.http-client__settings > label { display: grid; gap: 5px; font-size: 12px; }
+.http-client__settings textarea { min-height: 94px; padding: 8px; resize: vertical; border: 1px solid var(--http-border); background: transparent; font: 12px/1.5 Consolas, monospace; }
+.http-client__settings-grid { display: grid; align-content: start; gap: 9px; }
+.http-client__settings-grid label { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.http-client__settings-grid input[type="number"] { width: 62px; margin-left: auto; padding: 3px; }
+.http-client__settings p { margin: 0; color: #f48771; }
+.http-client__settings small { grid-column: 1 / -1; color: var(--http-muted); }
+
+.http-client__workspace { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr); min-height: 0; }
+.http-client__editor-pane,
+.http-client__response-pane { display: grid; min-width: 0; min-height: 0; }
+.http-client__editor-pane { grid-template-rows: minmax(0, 1fr) auto auto; border-right: 1px solid var(--http-border); }
+.http-client__response-pane { grid-template-rows: auto auto minmax(0, 1fr); }
+
+.http-client--response-focused .http-client__workspace { grid-template-columns: 1fr; }
+.http-client--response-focused .http-client__editor-pane { display: none; }
+
+.http-client__editor-grid { display: grid; grid-template-columns: auto minmax(0, 1fr); min-height: 0; }
+.http-client__outline {
+    box-sizing: border-box;
+    width: 210px;
+    overflow: auto;
+    border-right: 1px solid var(--http-border);
+    background: color-mix(in srgb, currentColor 3%, transparent);
+}
+.http-client__outline > strong { display: block; padding: 8px 10px; color: var(--http-muted); font-size: 11px; font-weight: 600; }
+.http-client__outline > button { display: grid; grid-template-columns: 18px minmax(0, 1fr); width: 100%; border: 0; padding: 4px 8px; background: transparent; text-align: left; }
+.http-client__outline > button small { grid-column: 2; overflow: hidden; color: var(--http-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.http-client__outline p { padding: 0 10px; color: var(--http-muted); font-size: 11px; }
+
+.http-client__code-lenses { max-height: 120px; overflow: auto; border-top: 1px solid var(--http-border); font-size: 12px; }
+.http-client__code-lenses > span { display: block; padding: 7px 11px; color: var(--http-muted); }
+.http-client__code-lens { display: flex; align-items: center; gap: 7px; padding: 4px 10px; }
+.http-client__code-lens + .http-client__code-lens { border-top: 1px solid color-mix(in srgb, currentColor 8%, transparent); }
+.http-client__code-lens span { min-width: 0; margin-right: auto; overflow: hidden; color: var(--http-muted); text-overflow: ellipsis; white-space: nowrap; }
+.http-client__code-lens button { border: 0; padding: 2px 5px; background: transparent; color: #3794ff; }
+.http-client__code-lens--reference { background: color-mix(in srgb, #1684ff 3%, transparent); }
+
+.http-client__response {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 14px 16px;
+    overflow: auto;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: inherit;
+    font: 13px/1.58 var(--vscode-editor-font-family, Consolas, "Cascadia Code", monospace);
+    tab-size: 4;
+    white-space: pre;
+}
+.http-client__source { min-width: 0; min-height: 0; overflow: hidden; }
+.http-client__source .cm-http-link { color: #3794ff; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.http-client__source .cm-http-diagnostic--error { text-decoration: wavy underline #f14c4c; text-decoration-skip-ink: none; }
+.http-client__source .cm-http-diagnostic--information { text-decoration: dotted underline #3794ff; text-decoration-skip-ink: none; }
+.cm-http-hover { max-width: 520px; padding: 7px 9px; font: 12px/1.5 var(--vscode-font-family, "Segoe UI", sans-serif); }
+.cm-http-hover > div + div { margin-top: 5px; }
+
+.http-client__problems { max-height: 116px; overflow: auto; border-top: 1px solid var(--http-border); font-size: 11px; }
+.http-client__problems header { display: flex; align-items: center; padding: 4px 9px; color: var(--http-muted); }
+.http-client__problems header button { margin-left: auto; border: 0; padding: 0 5px; background: transparent; }
+.http-client__problems > button { display: flex; align-items: center; gap: 7px; width: 100%; border: 0; padding: 3px 10px; background: transparent; text-align: left; }
+.http-client__problems > button small { margin-left: auto; color: var(--http-muted); }
+.http-client__problems .is-error { color: #f14c4c; }
+.http-client__problems .is-information { color: #3794ff; }
+.http-client__show-problems { justify-self: start; margin: 4px 8px; border: 0 !important; background: transparent !important; color: #3794ff !important; font-size: 11px !important; }
+
+.http-client__response-toolbar strong { margin-right: auto; }
+.http-client__response-toolbar span { color: var(--http-muted); font-size: 12px; }
+.http-client__history { display: flex; gap: 1px; overflow-x: auto; border-bottom: 1px solid var(--http-border); }
+.http-client__history button { flex: 0 0 auto; border: 0; border-bottom: 2px solid transparent; background: transparent; font-size: 11px; }
+.http-client__history button.is-active { border-bottom-color: #3794ff; }
+
+.http-client__inline-error,
+.http-client-error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 11px;
+    background: color-mix(in srgb, #f14c4c 18%, var(--vscode-editor-background, #1e1e1e));
+    color: #ffd7d7;
+}
+.http-client__inline-error span { margin-right: auto; }
+.http-client__inline-error button { border: 0; background: transparent; }
+.http-client-error { height: 100%; box-sizing: border-box; justify-content: center; flex-direction: column; }
+.http-client__status { display: flex; justify-content: space-between; gap: 10px; padding: 4px 10px; border-top: 1px solid var(--http-border); color: var(--http-muted); font-size: 11px; }
+
+@media (max-width: 900px) {
+    .http-client__workspace { grid-template-columns: 1fr; grid-template-rows: minmax(280px, 1fr) minmax(280px, 1fr); }
+    .http-client__editor-pane { border-right: 0; border-bottom: 1px solid var(--http-border); }
+    .http-client__settings { grid-template-columns: 1fr; }
+    .http-client__settings small { grid-column: auto; }
+    .http-client__outline { width: 170px; }
+}
