@@ -2,7 +2,7 @@
 	"name": "vscode-office",
 	"displayName": "Office Viewer",
 	"description": "Standalone Windows document viewer and editor with Office, Markdown, archive, Git history and AI assistant support.",
-	"version": "0.5.0",
+	"version": "0.5.1",
 	"publisher": "suzike",
 	"icon": "image/logo.png",
 	"engines": {

@@ -1,5 +1,18 @@
 # Change log
 
+# 0.5.1 Desktop Layout Hotfix 2026-7-22
+
+Desktop application:
+
+- Fix the desktop shell failing to expand after Windows DPI or viewport changes, which left a large blank area below the status bar.
+- Pin the header, tab strip, workspace and status bar to explicit grid rows so the fixed AI assistant cannot disturb the application layout.
+- Keep the Markdown editor-theme picker within its compact height after the document viewport expands.
+- Add Electron regression assertions that require both the application shell and status bar to reach the viewport bottom.
+
+Release engineering:
+
+- Make the Windows Release workflow upload versioned installers without hard-coded `0.5.0` filenames.
+
 # 0.5.0 Desktop Baseline 2026-7-22
 
 This release establishes the first independently maintained Windows desktop baseline.

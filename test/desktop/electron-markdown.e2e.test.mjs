@@ -99,12 +99,17 @@ test('desktop preserves the original Vditor Markdown UI, saves edits, loads loca
     const tabs = rect('.tab-strip')
     const metadata = rect('.metadata-bar')
     const surface = rect('.document-surface')
+    const shell = rect('.desktop-shell')
+    const status = rect('.status-bar')
     return {
       titleHeight: title?.height,
       menuHeight: menu?.height,
       tabHeight: tabs?.height,
       metadataHeight: metadata?.height,
       documentTop: surface?.top,
+      shellBottom: shell?.bottom,
+      statusBottom: status?.bottom,
+      viewportHeight: window.innerHeight,
     }
   })
   assert.equal(chromeMetrics.titleHeight, 38)
@@ -112,6 +117,8 @@ test('desktop preserves the original Vditor Markdown UI, saves edits, loads loca
   assert.equal(chromeMetrics.tabHeight, 34)
   assert.equal(chromeMetrics.metadataHeight, 38)
   assert.ok(chromeMetrics.documentTop <= 111, `Desktop chrome is too tall: ${chromeMetrics.documentTop}px`)
+  assert.ok(Math.abs(chromeMetrics.shellBottom - chromeMetrics.viewportHeight) <= 1, `Desktop shell does not fill the viewport: ${chromeMetrics.shellBottom}px / ${chromeMetrics.viewportHeight}px`)
+  assert.ok(Math.abs(chromeMetrics.statusBottom - chromeMetrics.viewportHeight) <= 1, `Status bar is not anchored to the viewport bottom: ${chromeMetrics.statusBottom}px / ${chromeMetrics.viewportHeight}px`)
 
   await page.click('.menu-button')
   await page.waitForSelector('.menu-popover', { visible: true })

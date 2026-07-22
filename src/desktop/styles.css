@@ -55,7 +55,9 @@ button:focus-visible, [tabindex]:focus-visible {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) 24px;
   width: 100%;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   background:
     linear-gradient(90deg, transparent 39px, color-mix(in srgb, var(--line) 35%, transparent) 40px, transparent 41px),
     var(--paper);
@@ -64,7 +66,7 @@ button:focus-visible, [tabindex]:focus-visible {
 
 .desktop-shell.is-dragging { cursor: copy; }
 
-.app-header { border-bottom: 1px solid var(--line-strong); background: var(--paper-raised); z-index: 20; }
+.app-header { grid-row: 1; border-bottom: 1px solid var(--line-strong); background: var(--paper-raised); z-index: 20; }
 
 .title-row {
   display: flex;
@@ -132,6 +134,7 @@ button:focus-visible, [tabindex]:focus-visible {
 
 .tab-strip {
   display: flex;
+  grid-row: 2;
   min-width: 0;
   height: 34px;
   overflow-x: auto;
@@ -176,7 +179,7 @@ button:focus-visible, [tabindex]:focus-visible {
 .file-token--xls, .file-token--xlsx { background: #34715a; color: #fff; }
 .file-token--ppt, .file-token--pptx { background: #bc593b; color: #fff; }
 
-.workspace { min-width: 0; min-height: 0; overflow: hidden; }
+.workspace { grid-row: 3; min-width: 0; min-height: 0; overflow: hidden; }
 
 .welcome {
   display: grid;
@@ -304,7 +307,7 @@ button:focus-visible, [tabindex]:focus-visible {
 .desktop-html-error { position: absolute; z-index: 5; top: 44px; right: 8px; max-width: min(520px, calc(100% - 16px)); }
 .text-preview { min-height: 100%; margin: 0; padding: 32px clamp(24px, 6vw, 84px); overflow: auto; background: var(--paper-raised); color: var(--ink); font: 12px/1.65 var(--mono); white-space: pre-wrap; }
 
-.status-bar { display: flex; align-items: center; gap: 16px; height: 24px; padding: 0 10px; background: var(--graphite); color: #b9bcb7; font: 7px/1 var(--mono); letter-spacing: .12em; }
+.status-bar { display: flex; grid-row: 4; align-items: center; gap: 16px; height: 24px; padding: 0 10px; background: var(--graphite); color: #b9bcb7; font: 7px/1 var(--mono); letter-spacing: .12em; }
 .status-bar > span + span { padding-left: 16px; border-left: 1px solid #3f4440; }
 .status-bar__spacer { flex: 1; padding: 0 !important; border: 0 !important; }
 
