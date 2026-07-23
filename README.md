@@ -17,7 +17,7 @@
   <a href="https://github.com/suzike/Office-Viewer/actions/workflows/main.yml"><img src="https://github.com/suzike/Office-Viewer/actions/workflows/main.yml/badge.svg" alt="CI"></a>
 </p>
 
-![Office Viewer AI 文档助手](docs/assets/screenshots/ai-assistant.png)
+![Office Viewer AI 文档助手](docs/assets/screenshots/ai-assistant.png?v=0.5.6)
 
 ## 项目定位
 
@@ -44,12 +44,12 @@ Office Viewer Desktop 是一个真正的 Windows 桌面应用，不是 VS Code �
 
 <table>
   <tr>
-    <td width="50%"><strong>Excel 工作簿</strong><br><img src="docs/assets/screenshots/excel-workbook.png" alt="Excel viewer"></td>
-    <td width="50%"><strong>Word 编辑器</strong><br><img src="docs/assets/screenshots/word-editor.png" alt="Word editor"></td>
+    <td width="50%"><strong>Excel 工作簿</strong><br><img src="docs/assets/screenshots/excel-workbook.png?v=0.5.6" alt="Excel viewer"></td>
+    <td width="50%"><strong>Word 编辑器</strong><br><img src="docs/assets/screenshots/word-editor.png?v=0.5.6" alt="Word editor"></td>
   </tr>
   <tr>
-    <td width="50%"><strong>PowerPoint 查看器</strong><br><img src="docs/assets/screenshots/powerpoint-viewer.png" alt="PowerPoint viewer"></td>
-    <td width="50%"><strong>Git History</strong><br><img src="image/README/1783342874748.png" alt="Git History"></td>
+    <td width="50%"><strong>PowerPoint 查看器</strong><br><img src="docs/assets/screenshots/powerpoint-viewer.png?v=0.5.6" alt="PowerPoint viewer"></td>
+    <td width="50%"><strong>Git History</strong><br><img src="image/README/1783342874748.png?v=0.5.6" alt="Git History"></td>
   </tr>
 </table>
 
