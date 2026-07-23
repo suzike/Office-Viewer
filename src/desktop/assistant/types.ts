@@ -23,6 +23,14 @@ export interface AssistantDocumentContext {
   path?: string
   selection?: AssistantSelectionContext | null
   metadata?: Readonly<Record<string, string | number | boolean | null>>
+  /** How the document text was extracted for the model (shown after the first request). */
+  extraction?: {
+    strategy: string
+    extractedCharacters: number
+    sourceCharacters: number
+    truncated: boolean
+    warning?: string
+  } | null
 }
 
 export interface AssistantReference {
@@ -39,6 +47,14 @@ export interface AssistantMessage {
   modelLabel?: string
   pending?: boolean
   references?: readonly AssistantReference[]
+  /** Filled when the request completes: client-measured latency and answer size. */
+  stats?: {
+    durationMs?: number
+    ttftMs?: number
+    characters?: number
+  }
+  /** Selection text attached when the user message was sent; reused by edit-and-resend. */
+  selectionSnapshot?: string
 }
 
 export type AssistantQuickActionId =
@@ -56,6 +72,19 @@ export interface AssistantQuickAction {
   description: string
   prompt: string
   requiresSelection?: boolean
+}
+
+/** Saved prompt shown in the composer prompt library. */
+export interface AssistantPromptSnippet {
+  id: string
+  title: string
+  content: string
+}
+
+/** External request to insert text into the composer (token changes trigger the insert). */
+export interface AssistantComposerInsert {
+  text: string
+  token: number
 }
 
 export interface AssistantRequestContext {
@@ -85,6 +114,10 @@ export interface DocumentAssistantProps {
   placeholder?: string
   privacyNote?: string
   quickActions?: readonly AssistantQuickAction[]
+  /** Prompt library entries shown above the composer for one-click insert. */
+  promptSnippets?: readonly AssistantPromptSnippet[]
+  /** When the token changes, the text is appended to the composer draft. */
+  composerInsert?: AssistantComposerInsert | null
   defaultWidth?: number
   minWidth?: number
   maxWidth?: number
@@ -95,6 +128,12 @@ export interface DocumentAssistantProps {
   onStop?: () => void
   onClear?: () => void
   onRetry?: () => void
+  /** Regenerate the last assistant answer (same mechanics as retry). */
+  onRegenerate?: () => void
+  /** Edit a user message and resend it, truncating everything that followed it. */
+  onEditResend?: (messageId: string, content: string) => void | Promise<void>
+  /** Export the current conversation as a Markdown file. */
+  onExportChat?: () => void
   onOpenSettings?: () => void
   onReferenceActivate?: (messageId: string, reference: AssistantReference) => void
 }

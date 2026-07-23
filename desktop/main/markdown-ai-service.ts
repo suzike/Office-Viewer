@@ -67,6 +67,18 @@ export class MarkdownAiService {
 
 function buildPolishPrompt(markdown: string, options: DesktopMarkdownAiOptions): string {
   const parts = ['You are a writing assistant.']
+  if (options.task === 'toc') {
+    parts.push('Generate a table of contents for the following Markdown document based on its heading structure: a nested Markdown unordered list with one item per heading, indented by heading level.')
+    parts.push(outputLanguageInstruction(options.outputLanguage, options.uiLanguage))
+    parts.push(`Return ONLY the table of contents list with no extra commentary.\n\n${markdown}`)
+    return parts.join('\n')
+  }
+  if (options.task === 'summary') {
+    parts.push('Write a concise summary of the following Markdown document (3 to 6 short sentences or bullet points).')
+    parts.push(outputLanguageInstruction(options.outputLanguage, options.uiLanguage))
+    parts.push(`Return ONLY the summary with no extra commentary.\n\n${markdown}`)
+    return parts.join('\n')
+  }
   parts.push(options.prompt?.trim() || 'Polish the following Markdown text: improve clarity, fix grammar, and enhance readability.')
   if (options.goal?.trim()) parts.push(`Focus on: ${options.goal.trim()}`)
   parts.push(outputLanguageInstruction(options.outputLanguage, options.uiLanguage))

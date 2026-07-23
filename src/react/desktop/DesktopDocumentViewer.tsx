@@ -6,6 +6,7 @@ import {
     dispatchHostMessage,
     installOfficeHostBridge,
     type OfficeHostBridge,
+    type OfficeHostBridgeHandle,
 } from '../util/vscode';
 
 const Excel = lazy(() => import('../view/excel/Excel'));
@@ -30,6 +31,8 @@ const XmindViewer = lazy(() => import('../view/xmind/XmindViewer'));
 export interface DesktopDocumentViewerProps {
     session: DesktopFileSession;
     forceText?: boolean;
+    /** Whether this document is the visible one; drives host-bridge activation. */
+    active?: boolean;
     onDirtyChange?: (dirty: boolean) => void;
     onSessionReplaced?: (session: DesktopFileSession) => void;
 }
@@ -160,12 +163,20 @@ function OfficeRenderer({ route }: { route: Exclude<ViewerRoute, 'archive' | 'ht
 export default function DesktopDocumentViewer({
     session,
     forceText = false,
+    active = true,
     onDirtyChange,
     onSessionReplaced,
 }: DesktopDocumentViewerProps) {
     const route = useMemo(() => forceText ? 'text' : routeForExtension(session.extension, session.name), [forceText, session.extension, session.name]);
     const dirtyRef = useRef(false);
     const [loadError, setLoadError] = useState<string>();
+    const bridgeHandleRef = useRef<OfficeHostBridgeHandle>();
+
+    // Bring this document's host bridge to the top whenever it becomes visible,
+    // so save/change messages from hidden keep-alive viewers can never misroute.
+    useLayoutEffect(() => {
+        if (active) bridgeHandleRef.current?.activate();
+    }, [active]);
 
     useLayoutEffect(() => {
         if (route === 'archive' || route === 'html' || route === 'http' || route === 'image' || route === 'java' || route === 'markdown' || route === 'pdf' || route === 'svg' || route === 'text' || route === 'unsupported') return;
@@ -265,8 +276,10 @@ export default function DesktopDocumentViewer({
         };
 
         const uninstall = installOfficeHostBridge(bridge);
+        bridgeHandleRef.current = uninstall;
         return () => {
             disposed = true;
+            bridgeHandleRef.current = undefined;
             uninstall();
         };
     }, [onDirtyChange, onSessionReplaced, route, session]);
@@ -320,14 +333,14 @@ export default function DesktopDocumentViewer({
     if (route === 'archive') {
         return (
             <Suspense fallback={<Spin fullscreen tip={`正在载入 ${session.name}`} />}>
-                <DesktopArchiveDocumentViewer session={session} />
+                <DesktopArchiveDocumentViewer session={session} active={active} />
             </Suspense>
         );
     }
     if (route === 'image') {
         return (
             <Suspense fallback={<Spin fullscreen tip={`正在载入 ${session.name}`} />}>
-                <DesktopImageDocumentViewer session={session} />
+                <DesktopImageDocumentViewer session={session} active={active} />
             </Suspense>
         );
     }
@@ -347,6 +360,7 @@ export default function DesktopDocumentViewer({
             <Suspense fallback={<Spin fullscreen tip={`正在载入 ${session.name}`} />}>
                 <DesktopSvgDocumentViewer
                     session={session}
+                    active={active}
                     onDirtyChange={onDirtyChange}
                     onSessionReplaced={onSessionReplaced}
                 />

@@ -5,10 +5,12 @@ import {
     dispatchHostMessage,
     installOfficeHostBridge,
     type OfficeHostBridge,
+    type OfficeHostBridgeHandle,
 } from '../util/vscode';
 
 export interface DesktopSvgDocumentViewerProps {
     session: DesktopFileSession;
+    active?: boolean;
     onDirtyChange?: (dirty: boolean) => void;
     onSessionReplaced?: (session: DesktopFileSession) => void;
 }
@@ -45,12 +47,17 @@ function suggestedName(session: DesktopFileSession, extension: unknown): string 
 
 export default function DesktopSvgDocumentViewer({
     session,
+    active = true,
     onDirtyChange,
     onSessionReplaced,
 }: DesktopSvgDocumentViewerProps) {
     const dirtyRef = useRef(false);
     const [bridgeError, setBridgeError] = useState<string>();
+    const bridgeHandleRef = useRef<OfficeHostBridgeHandle>();
 
+    useLayoutEffect(() => {
+        if (active) bridgeHandleRef.current?.activate();
+    }, [active]);
     useLayoutEffect(() => {
         let disposed = false;
 
@@ -154,8 +161,10 @@ export default function DesktopSvgDocumentViewer({
         };
 
         const uninstall = installOfficeHostBridge(bridge);
+        bridgeHandleRef.current = uninstall;
         return () => {
             disposed = true;
+            bridgeHandleRef.current = undefined;
             uninstall();
         };
     }, [onDirtyChange, onSessionReplaced, session]);

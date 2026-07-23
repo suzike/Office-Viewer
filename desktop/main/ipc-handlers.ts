@@ -25,7 +25,11 @@ import { DesktopHttpService } from './http-service'
 import { HttpSettingsService } from './http-settings-service'
 import { MarkdownAiService } from './markdown-ai-service'
 import { MarkdownExportService } from './markdown-export-service'
+import { HtmlExportService } from './html-export-service'
 import { saveMarkdownImage } from './markdown-image-service'
+import { buildMarkdownFileLinks } from './markdown-resource-service'
+import { findMissingMarkdownReferences } from './markdown-link-scanner'
+import { MarkdownTemplateService } from './markdown-template-service'
 import { MarkdownSettingsService } from './markdown-settings-service'
 import { AiAssistantSettingsService } from './ai-assistant-settings-service'
 import { AiDocumentContextService } from './ai-document-context-service'
@@ -74,6 +78,8 @@ interface RegisterIpcHandlersOptions {
   readonly publishFilesOpened: (event: DesktopFilesOpenedEvent) => void
   readonly markRendererReady: () => void
   readonly setRendererDirtyState: (dirty: boolean) => void
+  /** Called after assistant settings are saved so the global shortcut stays in sync. */
+  readonly onAssistantSettingsSaved?: (settings: import('../shared/desktop-api').DesktopAiAssistantSettings) => void
 }
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions): () => void {
@@ -104,6 +110,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions): () => 
     decrypt: (value) => safeStorage.decryptString(Buffer.from(value)),
   })
   const markdownExport = new MarkdownExportService(resolveApplicationRoot())
+  const markdownTemplates = new MarkdownTemplateService(app.getPath('userData'))
+  const htmlExport = new HtmlExportService()
   const markdownAi = new MarkdownAiService()
   const aiAssistantSettings = new AiAssistantSettingsService(app.getPath('userData'), {
     isAvailable: () => safeStorage.isEncryptionAvailable(),
@@ -149,6 +157,13 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions): () => 
     const paths = validateDroppedPaths(rawPaths)
     const files = await sessions.registerPaths(paths)
     publishFilesOpened({ reason: 'drop', files })
+    return { canceled: false, files } satisfies DesktopOpenDialogResult
+  })
+
+  handle(IPC_CHANNELS.openPaths, async (_event, rawPaths) => {
+    const paths = validateDroppedPaths(rawPaths)
+    const files = await sessions.registerPaths(paths)
+    publishFilesOpened({ reason: 'reopen', files })
     return { canceled: false, files } satisfies DesktopOpenDialogResult
   })
 
@@ -350,6 +365,51 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions): () => 
     return result
   })
 
+  handle(IPC_CHANNELS.printMarkdown, async (_event, sessionId, markdown) => {
+    const path = requireMarkdownPath(sessions.getPath(requireSessionId(sessionId)))
+    await markdownExport.print(path, requireMarkdownExportText(markdown))
+  })
+
+  handle(IPC_CHANNELS.exportMarkdownImage, async (_event, sessionId, markdown) => {
+    const path = requireMarkdownPath(sessions.getPath(requireSessionId(sessionId)))
+    const result = await markdownExport.exportImage(path, requireMarkdownExportText(markdown))
+    shell.showItemInFolder(result.path)
+    return result
+  })
+
+  handle(IPC_CHANNELS.exportMarkdownText, async (_event, sessionId, markdown) => {
+    const path = requireMarkdownPath(sessions.getPath(requireSessionId(sessionId)))
+    const result = await markdownExport.exportText(path, requireMarkdownExportText(markdown))
+    shell.showItemInFolder(result.path)
+    return result
+  })
+
+  handle(IPC_CHANNELS.markdownDropFileLinks, (_event, sessionId, rawPaths) => {
+    const path = requireMarkdownPath(sessions.getPath(requireSessionId(sessionId)))
+    return buildMarkdownFileLinks(path, validateDroppedPaths(rawPaths))
+  })
+
+  handle(IPC_CHANNELS.scanMarkdownDeadLinks, (_event, sessionId, markdown) => {
+    const path = requireMarkdownPath(sessions.getPath(requireSessionId(sessionId)))
+    return findMissingMarkdownReferences(path, requireMarkdownExportText(markdown))
+  })
+
+  handle(IPC_CHANNELS.loadMarkdownTemplates, () => markdownTemplates.list())
+
+  handle(IPC_CHANNELS.exportHtmlPdf, async (_event, sessionId) => {
+    const path = requireHtmlPath(sessions.getPath(requireSessionId(sessionId)))
+    const result = await htmlExport.exportPdf(path)
+    shell.showItemInFolder(result.path)
+    return result
+  })
+
+  handle(IPC_CHANNELS.exportHtmlImage, async (_event, sessionId) => {
+    const path = requireHtmlPath(sessions.getPath(requireSessionId(sessionId)))
+    const result = await htmlExport.exportImage(path)
+    shell.showItemInFolder(result.path)
+    return result
+  })
+
   handle(IPC_CHANNELS.startMarkdownAiPolish, async (_event, sessionId, requestId, markdown, aiOptions) => {
     const id = requireSessionId(sessionId)
     requireMarkdownPath(sessions.getPath(id))
@@ -379,6 +439,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions): () => 
   handle(IPC_CHANNELS.saveAiAssistantSettings, async (_event, settings) => {
     const saved = await aiAssistantSettings.save(requireObject(settings, 'AI assistant settings') as unknown as import('../shared/desktop-api').DesktopAiAssistantSettingsInput)
     aiAssistant.invalidateProviderProbe()
+    options.onAssistantSettingsSaved?.(saved)
     return saved
   })
 
@@ -435,6 +496,24 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions): () => 
     return true
   })
 
+  handle(IPC_CHANNELS.windowMinimize, () => {
+    requireWindow(getWindow).minimize()
+  })
+
+  handle(IPC_CHANNELS.windowToggleMaximize, () => {
+    const window = requireWindow(getWindow)
+    if (window.isMaximized()) {
+      window.unmaximize()
+      return false
+    }
+    window.maximize()
+    return true
+  })
+
+  handle(IPC_CHANNELS.windowClose, () => {
+    requireWindow(getWindow).close()
+  })
+
   const onRendererReady = (event: IpcMainEvent) => {
     assertTrustedSender(event, isTrustedSender)
     markRendererReady()
@@ -456,6 +535,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions): () => 
     for (const channel of [
       IPC_CHANNELS.openFiles,
       IPC_CHANNELS.openDroppedFiles,
+      IPC_CHANNELS.openPaths,
       IPC_CHANNELS.readFile,
       IPC_CHANNELS.saveFile,
       IPC_CHANNELS.saveFileAs,
@@ -483,6 +563,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions): () => 
       IPC_CHANNELS.pasteMarkdownImage,
       IPC_CHANNELS.selectMarkdownImage,
       IPC_CHANNELS.exportMarkdown,
+      IPC_CHANNELS.printMarkdown,
+      IPC_CHANNELS.exportMarkdownImage,
+      IPC_CHANNELS.exportMarkdownText,
+      IPC_CHANNELS.markdownDropFileLinks,
+      IPC_CHANNELS.scanMarkdownDeadLinks,
+      IPC_CHANNELS.loadMarkdownTemplates,
+      IPC_CHANNELS.exportHtmlPdf,
+      IPC_CHANNELS.exportHtmlImage,
       IPC_CHANNELS.startMarkdownAiPolish,
       IPC_CHANNELS.cancelMarkdownAiPolish,
       IPC_CHANNELS.loadAiAssistantSettings,
@@ -495,6 +583,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions): () => 
       IPC_CHANNELS.openWithSystem,
       IPC_CHANNELS.openExternal,
       IPC_CHANNELS.toggleDevTools,
+      IPC_CHANNELS.windowMinimize,
+      IPC_CHANNELS.windowToggleMaximize,
+      IPC_CHANNELS.windowClose,
     ]) {
       ipcMain.removeHandler(channel)
     }
@@ -562,6 +653,11 @@ function requireMarkdownLink(value: unknown): string {
 
 function requireMarkdownPath(value: string): string {
   if (!/\.(?:md|markdown)$/i.test(value)) throw new Error('A Markdown document session is required.')
+  return value
+}
+
+function requireHtmlPath(value: string): string {
+  if (!/\.(?:html?|xhtml)$/i.test(value)) throw new Error('An HTML document session is required.')
   return value
 }
 

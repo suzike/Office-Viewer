@@ -3,6 +3,8 @@ import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
+const packageVersion = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')).version as string
+
 function copyOriginalPdfViewer() {
   return {
     name: 'copy-original-pdf-viewer',
@@ -82,6 +84,7 @@ export default defineConfig({
   base: './',
   define: {
     global: 'globalThis',
+    __OFFICE_DESKTOP_VERSION__: JSON.stringify(packageVersion),
   },
   resolve: {
     alias: {

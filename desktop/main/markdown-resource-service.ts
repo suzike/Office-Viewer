@@ -1,5 +1,5 @@
 import { realpath, stat } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 import type { FileSessionManager } from './file-session-manager'
 
@@ -33,6 +33,26 @@ export async function resolveMarkdownWorkspaceResource(
   const resourceStat = await stat(candidate)
   if (!resourceStat.isFile()) throw new Error('Only regular Markdown workspace resources can be loaded.')
   return candidate
+}
+
+/**
+ * Build Markdown link text for non-image files dropped into the editor. Links
+ * are expressed relative to the Markdown document directory so they remain
+ * portable within the workspace. Image drops keep flowing through the image
+ * upload pipeline instead.
+ */
+export function buildMarkdownFileLinks(documentPath: string, absolutePaths: readonly string[]): string {
+  const documentDirectory = dirname(documentPath)
+  return absolutePaths.map((filePath) => {
+    const name = basename(filePath).replace(/[[\]]/g, '_')
+    const relativePath = relative(documentDirectory, filePath).split(sep).join('/')
+    const target = relativePath.startsWith('.') ? relativePath : `./${relativePath}`
+    return `[${name}](${encodeMarkdownLinkPath(target)})`
+  }).join('\n')
+}
+
+function encodeMarkdownLinkPath(value: string): string {
+  return value.split('/').map((segment) => encodeURIComponent(segment).replace(/%20/g, ' ')).join('/')
 }
 
 export async function findMarkdownWorkspaceDirectory(documentPath: string): Promise<string> {

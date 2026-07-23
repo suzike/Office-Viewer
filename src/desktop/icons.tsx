@@ -6,7 +6,7 @@ const base = {
   viewBox: '0 0 24 24',
   fill: 'none',
   stroke: 'currentColor',
-  strokeWidth: 1.7,
+  strokeWidth: 1.5,
   strokeLinecap: 'round' as const,
   strokeLinejoin: 'round' as const,
   'aria-hidden': true,
@@ -15,7 +15,7 @@ const base = {
 export function AppMark({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 28 28" aria-hidden="true">
-      <path fill="currentColor" d="M3 3h22v22H3z" />
+      <rect fill="currentColor" x="3" y="3" width="22" height="22" rx="6" />
       <path fill="var(--mark-cut)" d="M8 8h12v3H8zm0 5h8v3H8zm0 5h12v3H8z" />
     </svg>
   )

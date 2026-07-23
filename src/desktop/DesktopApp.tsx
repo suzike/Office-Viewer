@@ -20,7 +20,7 @@ import { isDesktopTextFile } from '../../desktop/shared/text-language-routing'
 import { requestOpenFiles, subscribeToFileChanges, subscribeToOpenFiles } from './desktopApi'
 import { AiAssistantController } from './assistant'
 import { $t } from '../react/i18n/i18nConfig'
-import { getAntThemeConfig } from '../react/antThemeConfig'
+import { getDesktopAntThemeConfig } from '../react/antThemeConfig'
 import {
   AppMark,
   ChevronIcon,
@@ -38,7 +38,10 @@ import {
 const DesktopDocumentViewer = lazy(() => import('../react/desktop/DesktopDocumentViewer'))
 const DesktopGitHistoryWorkspace = lazy(() => import('../react/desktop/DesktopGitHistoryWorkspace'))
 
-const desktopVersion = '4.1.6'
+// Injected from package.json at build time (see vite.desktop.config.ts define).
+declare const __OFFICE_DESKTOP_VERSION__: string
+
+const desktopVersion = __OFFICE_DESKTOP_VERSION__
 
 type Theme = 'light' | 'dark'
 type MenuName = 'file' | 'view' | 'help'
@@ -142,10 +145,12 @@ function StatePanel({
 
 function ViewerSurface({
   document,
+  active,
   onDirtyChange,
   onSessionReplaced,
 }: {
   document: HostDocument
+  active: boolean
   onDirtyChange: (documentId: string, dirty: boolean) => void
   onSessionReplaced: (documentId: string, session: DesktopFileSession) => void
 }) {
@@ -180,6 +185,7 @@ function ViewerSurface({
           key={`${document.session.id}:${document.revision}`}
           session={document.session}
           forceText={document.forceText}
+          active={active}
           onDirtyChange={handleDirtyChange}
           onSessionReplaced={handleSessionReplaced}
         />
@@ -196,8 +202,14 @@ export function DesktopApp() {
     localStorage.setItem('office-desktop-theme', theme)
   }, [theme])
 
+  useEffect(() => {
+    if (window.officeDesktop.windowMaterial) {
+      document.documentElement.dataset.material = window.officeDesktop.windowMaterial
+    }
+  }, [])
+
   return (
-    <ConfigProvider theme={getAntThemeConfig(theme === 'dark')}>
+    <ConfigProvider theme={getDesktopAntThemeConfig(theme === 'dark')}>
       <AntdApp>
         <DesktopAppShell theme={theme} setTheme={setTheme} />
       </AntdApp>
@@ -260,6 +272,7 @@ function DesktopAppShell({
       return [...sessions, ...current.filter((session) => !incomingIds.has(session.id))].slice(0, 8)
     })
     setActiveId(sessions[sessions.length - 1].id)
+    setGitHistoryOpen(false)
     setOpenError(null)
   }, [])
 
@@ -281,11 +294,16 @@ function DesktopAppShell({
     if (!target) return
 
     const performClose = () => {
-      const next = documents.filter((document) => document.session.id !== id)
+      // Read the freshest documents: the confirm dialog is async and the list
+      // (or other tabs' state) may have changed while it was open.
+      const current = documentsRef.current
+      const freshIndex = current.findIndex((document) => document.session.id === id)
+      if (freshIndex === -1) return
+      const next = current.filter((document) => document.session.id !== id)
       setDocuments(next)
-      if (activeId === id) {
-        setActiveId(next[Math.min(index, next.length - 1)]?.session.id ?? null)
-      }
+      setActiveId((previous) => previous === id
+        ? next[Math.min(freshIndex, next.length - 1)]?.session.id ?? null
+        : previous)
       void window.officeDesktop.closeFile(id).catch((reason: unknown) => {
         setOpenError(reason instanceof Error ? reason.message : String(reason))
       })
@@ -304,6 +322,16 @@ function DesktopAppShell({
   }, [activeId, documents, modal])
 
   useEffect(() => subscribeToOpenFiles((event) => addHostSessions(event.files)), [addHostSessions])
+
+  // Close the app menu when clicking anywhere outside of it (Escape already handled).
+  useEffect(() => {
+    if (!activeMenu) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest('.menu-wrap')) setActiveMenu(null)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [activeMenu])
 
   useEffect(() => {
     documentsRef.current = documents
@@ -464,13 +492,36 @@ function DesktopAppShell({
   return (
     <div
       className={`desktop-shell${dragging ? ' is-dragging' : ''}`}
-      onDragEnter={(event) => { event.preventDefault(); dragDepth.current += 1; setDragging(true) }}
+      onDragEnter={(event) => { event.preventDefault(); if (!event.dataTransfer.types.includes('Files')) return; dragDepth.current += 1; setDragging(true) }}
       onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy' }}
       onDragLeave={(event) => { event.preventDefault(); dragDepth.current -= 1; if (dragDepth.current <= 0) setDragging(false) }}
       onDrop={handleDrop}
     >
       <header className="app-header">
         <div className="title-row">
+          <div className="window-controls" aria-label={$t('desktop.aria.appMenu')}>
+            <button
+              className="window-control window-control--close"
+              type="button"
+              aria-label="Close"
+              title="Close"
+              onClick={() => void window.officeDesktop.windowClose()}
+            ><svg viewBox="0 0 12 12" aria-hidden><path d="M3.2 3.2 8.8 8.8M8.8 3.2 3.2 8.8" /></svg></button>
+            <button
+              className="window-control window-control--minimize"
+              type="button"
+              aria-label="Minimize"
+              title="Minimize"
+              onClick={() => void window.officeDesktop.windowMinimize()}
+            ><svg viewBox="0 0 12 12" aria-hidden><path d="M2.5 6h7" /></svg></button>
+            <button
+              className="window-control window-control--maximize"
+              type="button"
+              aria-label="Maximize"
+              title="Maximize"
+              onClick={() => void window.officeDesktop.windowToggleMaximize()}
+            ><svg viewBox="0 0 12 12" aria-hidden><path d="M3.5 3.5h5v5h-5z" /></svg></button>
+          </div>
           <div className="brand" aria-label="Office Viewer">
             <AppMark className="brand__mark" />
             <span className="brand__name">OFFICE VIEWER</span>
@@ -490,7 +541,7 @@ function DesktopAppShell({
                     <div className="menu-popover" role="menu">
                       {menu === 'file' ? <>
                         <button role="menuitem" onClick={() => void openFiles()}><span>{$t('desktop.menu.openDocument')}</span><kbd>Ctrl O</kbd></button>
-                        <button role="menuitem" disabled={!activeDocument} onClick={() => activeDocument && closeDocument(activeDocument.session.id)}><span>{$t('desktop.menu.closeDocument')}</span><kbd>Ctrl W</kbd></button>
+                        <button role="menuitem" disabled={!activeDocument} onClick={() => { setActiveMenu(null); if (activeDocument) closeDocument(activeDocument.session.id) }}><span>{$t('desktop.menu.closeDocument')}</span><kbd>Ctrl W</kbd></button>
                         <button role="menuitem" onClick={() => window.close()}><span>{$t('desktop.menu.exit')}</span><kbd>Alt F4</kbd></button>
                       </> : menu === 'view' ? <>
                         <button role="menuitem" onClick={() => { setTheme(theme === 'light' ? 'dark' : 'light'); setActiveMenu(null) }}><span>{$t('desktop.menu.toggleTheme')}</span><span>{$t(theme === 'light' ? 'desktop.menu.dark' : 'desktop.menu.light')}</span></button>
@@ -549,8 +600,8 @@ function DesktopAppShell({
               tabIndex={document.session.id === activeId ? 0 : -1}
               aria-selected={document.session.id === activeId}
               key={document.session.id}
-              onClick={() => setActiveId(document.session.id)}
-              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setActiveId(document.session.id) }}
+              onClick={() => { setGitHistoryOpen(false); setActiveId(document.session.id) }}
+              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { setGitHistoryOpen(false); setActiveId(document.session.id) } }}
             >
               <span className={`file-token file-token--${document.session.extension || 'file'}`}>{document.session.extension?.slice(0, 3).toUpperCase() || 'FILE'}</span>
               <span className="document-tab__name">{document.session.name}</span>
@@ -611,6 +662,7 @@ function DesktopAppShell({
                   >
                     <ViewerSurface
                       document={document}
+                      active={document.session.id === activeId}
                       onDirtyChange={handleDocumentDirtyChange}
                       onSessionReplaced={handleDocumentSessionReplaced}
                     />
@@ -639,8 +691,11 @@ function DesktopAppShell({
                 <div className="recent-list">
                   {recentSessions.slice(0, 5).map((session, index) => (
                     <button key={session.id} onClick={() => {
-                      setDocuments((current) => current.some((document) => document.session.id === session.id) ? current : [...current, { session, dirty: false, revision: 0, forceText: false }])
-                      setActiveId(session.id)
+                      // Re-register by path so metadata and the file watcher are refreshed
+                      // (closing a tab suspends the session and its watcher).
+                      void window.officeDesktop.openPaths([session.path]).catch((reason: unknown) => {
+                        setOpenError(reason instanceof Error ? reason.message : String(reason))
+                      })
                     }}>
                       <span className="recent-list__index">{String(index + 1).padStart(2, '0')}</span>
                       <span className="recent-list__body"><strong>{session.name}</strong><small>{session.path}</small></span>
@@ -660,6 +715,10 @@ function DesktopAppShell({
           </section>
         )}
       </main>
+
+      {openError && documents.length > 0 && (
+        <div className="inline-error inline-error--floating" role="alert"><WarningIcon /><span>{openError}</span><button onClick={() => setOpenError(null)} aria-label={$t('desktop.aria.closeError')}><CloseIcon /></button></div>
+      )}
 
       <AiAssistantController session={gitHistoryOpen ? null : activeDocument?.session ?? null} />
 

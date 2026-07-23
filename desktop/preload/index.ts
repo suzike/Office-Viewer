@@ -12,6 +12,11 @@ import type {
   DesktopMarkdownAiEvent,
   DesktopMarkdownAiOptions,
   DesktopMarkdownExportResult,
+  DesktopMarkdownImageExportResult,
+  DesktopMarkdownTextExportResult,
+  DesktopMarkdownDeadLink,
+  DesktopMarkdownTemplate,
+  DesktopHtmlExportResult,
   DesktopMarkdownImageResult,
   DesktopMarkdownPreferencePatch,
   DesktopMarkdownPreferences,
@@ -38,6 +43,7 @@ type IpcChannels = typeof import('../shared/ipc-channels').IPC_CHANNELS
 const IPC_CHANNELS = {
   openFiles: 'office-desktop:files:open',
   openDroppedFiles: 'office-desktop:files:open-dropped',
+  openPaths: 'office-desktop:files:open-paths',
   readFile: 'office-desktop:files:read',
   saveFile: 'office-desktop:files:save',
   saveFileAs: 'office-desktop:files:save-as',
@@ -65,6 +71,14 @@ const IPC_CHANNELS = {
   pasteMarkdownImage: 'office-desktop:markdown:image:paste',
   selectMarkdownImage: 'office-desktop:markdown:image:select',
   exportMarkdown: 'office-desktop:markdown:export',
+  printMarkdown: 'office-desktop:markdown:print',
+  exportMarkdownImage: 'office-desktop:markdown:export-image',
+  exportMarkdownText: 'office-desktop:markdown:export-text',
+  markdownDropFileLinks: 'office-desktop:markdown:drop-file-links',
+  scanMarkdownDeadLinks: 'office-desktop:markdown:dead-links:scan',
+  loadMarkdownTemplates: 'office-desktop:markdown:templates:load',
+  exportHtmlPdf: 'office-desktop:html:export-pdf',
+  exportHtmlImage: 'office-desktop:html:export-image',
   startMarkdownAiPolish: 'office-desktop:markdown:ai:start',
   cancelMarkdownAiPolish: 'office-desktop:markdown:ai:cancel',
   loadAiAssistantSettings: 'office-desktop:assistant:settings:load',
@@ -77,11 +91,15 @@ const IPC_CHANNELS = {
   openWithSystem: 'office-desktop:files:open-with-system',
   openExternal: 'office-desktop:shell:open-external',
   toggleDevTools: 'office-desktop:window:toggle-devtools',
+  windowMinimize: 'office-desktop:window:minimize',
+  windowToggleMaximize: 'office-desktop:window:toggle-maximize',
+  windowClose: 'office-desktop:window:close',
   filesOpened: 'office-desktop:event:files-opened',
   fileChanged: 'office-desktop:event:file-changed',
   gitHistoryChanged: 'office-desktop:event:git-history-changed',
   markdownAiEvent: 'office-desktop:event:markdown-ai',
   aiAssistantEvent: 'office-desktop:event:ai-assistant',
+  aiAssistantFocus: 'office-desktop:event:assistant-focus',
   rendererReady: 'office-desktop:lifecycle:renderer-ready',
   dirtyState: 'office-desktop:lifecycle:dirty-state',
 } as const satisfies IpcChannels
@@ -91,6 +109,7 @@ const MAX_FILE_BYTES = 512 * 1024 * 1024
 
 const officeDesktop: DesktopApi = {
   platform: process.platform as DesktopPlatform,
+  windowMaterial: process.env.OFFICE_WINDOW_MATERIAL,
 
   openFiles: () =>
     ipcRenderer.invoke(IPC_CHANNELS.openFiles) as Promise<DesktopOpenDialogResult>,
@@ -108,6 +127,16 @@ const officeDesktop: DesktopApi = {
     return ipcRenderer.invoke(
       IPC_CHANNELS.openDroppedFiles,
       paths,
+    ) as Promise<DesktopOpenDialogResult>
+  },
+
+  openPaths: (paths) => {
+    if (!Array.isArray(paths) || paths.length === 0 || paths.some((path) => typeof path !== 'string' || !path)) {
+      return Promise.reject(new TypeError('At least one valid file path is required.'))
+    }
+    return ipcRenderer.invoke(
+      IPC_CHANNELS.openPaths,
+      [...paths],
     ) as Promise<DesktopOpenDialogResult>
   },
 
@@ -226,6 +255,54 @@ const officeDesktop: DesktopApi = {
     return ipcRenderer.invoke(IPC_CHANNELS.exportMarkdown, sessionId, markdown, option) as Promise<DesktopMarkdownExportResult>
   },
 
+  printMarkdown: (sessionId, markdown) => {
+    if (typeof markdown !== 'string' || markdown.length > 8 * 1024 * 1024) {
+      return Promise.reject(new RangeError('Markdown print input exceeds the 8 MB limit.'))
+    }
+    return ipcRenderer.invoke(IPC_CHANNELS.printMarkdown, sessionId, markdown) as Promise<void>
+  },
+
+  exportMarkdownImage: (sessionId, markdown) => {
+    if (typeof markdown !== 'string' || markdown.length > 8 * 1024 * 1024) {
+      return Promise.reject(new RangeError('Markdown export input exceeds the 8 MB limit.'))
+    }
+    return ipcRenderer.invoke(IPC_CHANNELS.exportMarkdownImage, sessionId, markdown) as Promise<DesktopMarkdownImageExportResult>
+  },
+
+  exportMarkdownText: (sessionId, markdown) => {
+    if (typeof markdown !== 'string' || markdown.length > 8 * 1024 * 1024) {
+      return Promise.reject(new RangeError('Markdown export input exceeds the 8 MB limit.'))
+    }
+    return ipcRenderer.invoke(IPC_CHANNELS.exportMarkdownText, sessionId, markdown) as Promise<DesktopMarkdownTextExportResult>
+  },
+
+  markdownDropFileLinks: (sessionId, files) => {
+    if (!Array.isArray(files) || files.length === 0 || files.length > 32) {
+      return Promise.reject(new TypeError('Between 1 and 32 dropped files are required.'))
+    }
+    const paths = files.map((file) => webUtils.getPathForFile(file))
+    if (paths.some((path) => path.length === 0)) {
+      return Promise.reject(new Error('One or more dropped files have no local path.'))
+    }
+    return ipcRenderer.invoke(IPC_CHANNELS.markdownDropFileLinks, sessionId, paths) as Promise<string>
+  },
+
+  scanMarkdownDeadLinks: (sessionId, markdown) => {
+    if (typeof markdown !== 'string' || markdown.length > 8 * 1024 * 1024) {
+      return Promise.reject(new RangeError('Markdown scan input exceeds the 8 MB limit.'))
+    }
+    return ipcRenderer.invoke(IPC_CHANNELS.scanMarkdownDeadLinks, sessionId, markdown) as Promise<readonly DesktopMarkdownDeadLink[]>
+  },
+
+  loadMarkdownTemplates: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.loadMarkdownTemplates) as Promise<readonly DesktopMarkdownTemplate[]>,
+
+  exportHtmlPdf: (sessionId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.exportHtmlPdf, sessionId) as Promise<DesktopHtmlExportResult>,
+
+  exportHtmlImage: (sessionId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.exportHtmlImage, sessionId) as Promise<DesktopHtmlExportResult>,
+
   startMarkdownAiPolish: (sessionId, requestId, markdown, options?: DesktopMarkdownAiOptions) => {
     if (typeof markdown !== 'string' || markdown.length > 2 * 1024 * 1024) {
       return Promise.reject(new RangeError('Markdown AI input exceeds the 2 MB limit.'))
@@ -265,6 +342,15 @@ const officeDesktop: DesktopApi = {
 
   toggleDevTools: () =>
     ipcRenderer.invoke(IPC_CHANNELS.toggleDevTools) as Promise<boolean>,
+
+  windowMinimize: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.windowMinimize) as Promise<void>,
+
+  windowToggleMaximize: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.windowToggleMaximize) as Promise<boolean>,
+
+  windowClose: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.windowClose) as Promise<void>,
 
   setDirtyState: (dirty) => {
     if (typeof dirty !== 'boolean') {
@@ -308,6 +394,12 @@ const officeDesktop: DesktopApi = {
     const wrapped = (_event: Electron.IpcRendererEvent, payload: DesktopAiAssistantEvent) => listener(payload)
     ipcRenderer.on(IPC_CHANNELS.aiAssistantEvent, wrapped)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.aiAssistantEvent, wrapped)
+  },
+
+  onAiAssistantFocus: (listener) => {
+    const wrapped = () => listener()
+    ipcRenderer.on(IPC_CHANNELS.aiAssistantFocus, wrapped)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.aiAssistantFocus, wrapped)
   },
 
 }

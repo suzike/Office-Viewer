@@ -11,15 +11,25 @@ export interface OfficeHostBridge {
 const vscode = window['acquireVsCodeApi']?.();
 export { vscode as vscodeApi };
 
-let hostBridge: OfficeHostBridge | undefined;
-let unsubscribeHostBridge: (() => void) | undefined;
+interface HostBridgeFrame {
+    bridge?: OfficeHostBridge;
+    unsubscribe?: () => void;
+    events: Record<string, (content: unknown) => void>;
+}
+
+// Frames are activation-ordered: the last frame owns outgoing messages and the
+// live event table, so a hidden document's viewer can never hijack (or be
+// orphaned by) the visible one when several viewers stay mounted via Activity.
+const hostBridgeStack: HostBridgeFrame[] = [];
+let activeHostFrame: HostBridgeFrame | undefined;
+const fallbackEvents: Record<string, (content: unknown) => void> = {};
 
 const postMessage = (message: HostMessage) => {
     if (vscode) {
         vscode.postMessage(message);
         return;
     }
-    hostBridge?.postMessage(message);
+    activeHostFrame?.bridge?.postMessage(message);
 }
 
 const DARK_MODE_KEY = 'office-dark-mode';
@@ -51,12 +61,15 @@ export function applyDarkMode(dark: boolean) {
     saveDarkMode(dark);
 }
 
-const events: Record<string, (content: unknown) => void> = {}
+function hostEventTable() {
+    return activeHostFrame?.events ?? fallbackEvents;
+}
 function receive({ data }: MessageEvent<HostMessage>) {
     if (!data)
         return;
-    if (events[data.type]) {
-        events[data.type](data.content);
+    const table = hostEventTable();
+    if (table[data.type]) {
+        table[data.type](data.content);
     }
 }
 window.addEventListener('message', receive)
@@ -65,19 +78,35 @@ export function dispatchHostMessage(message: HostMessage) {
     receive(new MessageEvent('message', { data: message }));
 }
 
-export function installOfficeHostBridge(bridge?: OfficeHostBridge) {
-    unsubscribeHostBridge?.();
-    unsubscribeHostBridge = undefined;
-    hostBridge = bridge;
+export interface OfficeHostBridgeHandle {
+    (): void;
+    /** Moves this frame to the top of the activation stack (call when its document becomes visible). */
+    activate(): void;
+}
+
+export function installOfficeHostBridge(bridge?: OfficeHostBridge): OfficeHostBridgeHandle {
+    const frame: HostBridgeFrame = { bridge, events: {} };
     if (bridge?.subscribe) {
-        unsubscribeHostBridge = bridge.subscribe(dispatchHostMessage);
+        frame.unsubscribe = bridge.subscribe(dispatchHostMessage);
     }
-    return () => {
-        if (hostBridge !== bridge) return;
-        unsubscribeHostBridge?.();
-        unsubscribeHostBridge = undefined;
-        hostBridge = undefined;
+    const activate = () => {
+        const index = hostBridgeStack.indexOf(frame);
+        if (index !== -1) hostBridgeStack.splice(index, 1);
+        hostBridgeStack.push(frame);
+        activeHostFrame = frame;
     };
+    activate();
+    const dispose = (() => {
+        const index = hostBridgeStack.indexOf(frame);
+        if (index !== -1) hostBridgeStack.splice(index, 1);
+        frame.unsubscribe?.();
+        frame.unsubscribe = undefined;
+        if (activeHostFrame === frame) {
+            activeHostFrame = hostBridgeStack.at(-1);
+        }
+    }) as OfficeHostBridgeHandle;
+    dispose.activate = activate;
+    return dispose;
 }
 const isMac = navigator.userAgent.includes('Mac OS');
 window.addEventListener('keydown', e => {
@@ -89,7 +118,7 @@ window.addEventListener('keydown', e => {
 const getVscodeEvent = () => {
     return {
         on(event: string, data) {
-            events[event] = data
+            hostEventTable()[event] = data
             return this;
         },
         emit(event: string, data?: any) {

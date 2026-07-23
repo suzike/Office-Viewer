@@ -6,6 +6,7 @@ export type DesktopOpenReason =
   | 'drop'
   | 'second-instance'
   | 'open-file'
+  | 'reopen'
 
 export interface DesktopFileSession {
   readonly id: string
@@ -206,8 +207,34 @@ export interface DesktopMarkdownExportResult {
   readonly path: string
 }
 
+export interface DesktopMarkdownImageExportResult {
+  readonly path: string
+}
+
+export interface DesktopMarkdownTextExportResult {
+  readonly path: string
+}
+
+export interface DesktopMarkdownDeadLink {
+  readonly kind: 'link' | 'image'
+  readonly target: string
+  readonly line: number
+}
+
+export interface DesktopMarkdownTemplate {
+  readonly id: string
+  readonly name: string
+  readonly content: string
+}
+
+export interface DesktopHtmlExportResult {
+  readonly type: 'pdf' | 'png'
+  readonly path: string
+}
+
 export interface DesktopMarkdownAiOptions {
   readonly engine?: 'custom' | 'vscode'
+  readonly task?: 'polish' | 'toc' | 'summary'
   readonly goal?: string
   readonly prompt?: string
   readonly outputLanguage?: string
@@ -259,16 +286,55 @@ export interface DesktopAiProviderInput {
   readonly removeApiKey?: boolean
 }
 
+/** Custom quick action managed from the assistant settings dialog. */
+export interface DesktopAiCustomAction {
+  readonly id: string
+  readonly label: string
+  readonly description?: string
+  readonly prompt: string
+  readonly requiresSelection?: boolean
+}
+
+/** Saved prompt snippet shown in the composer prompt library. */
+export interface DesktopAiPromptSnippet {
+  readonly id: string
+  readonly title: string
+  readonly content: string
+}
+
+/** Persona injected ahead of every document prompt. */
+export interface DesktopAiPromptProfile {
+  readonly persona?: string
+  readonly outputLanguage?: string
+  readonly style?: string
+}
+
+/** Optional sampling parameters applied to HTTP providers (CLI providers ignore them). */
+export interface DesktopAiModelParameters {
+  readonly temperature?: number
+  readonly maxTokens?: number
+}
+
 export interface DesktopAiAssistantSettings {
   readonly activeProviderId: string
   readonly providers: readonly DesktopAiProvider[]
   readonly contextCharacterLimit: number
+  readonly customActions: readonly DesktopAiCustomAction[]
+  readonly promptLibrary: readonly DesktopAiPromptSnippet[]
+  readonly promptProfile: DesktopAiPromptProfile
+  readonly globalShortcutEnabled: boolean
+  readonly modelParameters: DesktopAiModelParameters
 }
 
 export interface DesktopAiAssistantSettingsInput {
   readonly activeProviderId: string
   readonly providers: readonly DesktopAiProviderInput[]
   readonly contextCharacterLimit?: number
+  readonly customActions?: readonly DesktopAiCustomAction[]
+  readonly promptLibrary?: readonly DesktopAiPromptSnippet[]
+  readonly promptProfile?: DesktopAiPromptProfile
+  readonly globalShortcutEnabled?: boolean
+  readonly modelParameters?: DesktopAiModelParameters
 }
 
 export interface DesktopAiProviderStatus {
@@ -276,6 +342,10 @@ export interface DesktopAiProviderStatus {
   readonly available: boolean
   readonly detail: string
   readonly version?: string
+  /** Measured HTTP round-trip when the provider was probed over the network. */
+  readonly latencyMs?: number
+  /** Model identifiers reported by the provider during a network probe. */
+  readonly models?: readonly string[]
 }
 
 export interface DesktopAiDocumentContext {
@@ -313,9 +383,13 @@ export interface DesktopAiAssistantEvent {
 
 export interface DesktopApi {
   readonly platform: DesktopPlatform
+  /** OS window material in use (e.g. 'mica' on Windows 11); the renderer makes the shell transparent when set. */
+  readonly windowMaterial?: string
 
   openFiles(): Promise<DesktopOpenDialogResult>
   openDroppedFiles(files: readonly File[]): Promise<DesktopOpenDialogResult>
+  /** Re-registers known absolute paths (e.g. reopening recent files) so metadata and watchers are refreshed. */
+  openPaths(paths: readonly string[]): Promise<DesktopOpenDialogResult>
   readFile(sessionId: string): Promise<ArrayBuffer>
   saveFile(
     sessionId: string,
@@ -360,6 +434,17 @@ export interface DesktopApi {
     markdown: string,
     option: { readonly type: 'pdf' | 'html' | 'docx'; readonly withoutOutline?: boolean },
   ): Promise<DesktopMarkdownExportResult>
+  printMarkdown(sessionId: string, markdown: string): Promise<void>
+  exportMarkdownImage(sessionId: string, markdown: string): Promise<DesktopMarkdownImageExportResult>
+  exportMarkdownText(sessionId: string, markdown: string): Promise<DesktopMarkdownTextExportResult>
+  /** Builds relative Markdown links for non-image files dropped into the editor. */
+  markdownDropFileLinks(sessionId: string, files: readonly File[]): Promise<string>
+  /** Lists relative link/image references whose target file does not exist. */
+  scanMarkdownDeadLinks(sessionId: string, markdown: string): Promise<readonly DesktopMarkdownDeadLink[]>
+  /** Built-in and user-provided Markdown templates for the insert-template panel. */
+  loadMarkdownTemplates(): Promise<readonly DesktopMarkdownTemplate[]>
+  exportHtmlPdf(sessionId: string): Promise<DesktopHtmlExportResult>
+  exportHtmlImage(sessionId: string): Promise<DesktopHtmlExportResult>
   startMarkdownAiPolish(
     sessionId: string,
     requestId: string,
@@ -377,6 +462,9 @@ export interface DesktopApi {
   openWithSystem(sessionId: string): Promise<void>
   openExternal(url: string): Promise<void>
   toggleDevTools(): Promise<boolean>
+  windowMinimize(): Promise<void>
+  windowToggleMaximize(): Promise<boolean>
+  windowClose(): Promise<void>
   setDirtyState(dirty: boolean): void
 
   onFilesOpened(listener: (event: DesktopFilesOpenedEvent) => void): () => void
@@ -384,6 +472,8 @@ export interface DesktopApi {
   onGitHistoryChanged(listener: (event: DesktopGitHistoryChangedEvent) => void): () => void
   onMarkdownAiEvent(listener: (event: DesktopMarkdownAiEvent) => void): () => void
   onAiAssistantEvent(listener: (event: DesktopAiAssistantEvent) => void): () => void
+  /** Fired when the global assistant shortcut summons the window; the panel should open and focus. */
+  onAiAssistantFocus(listener: () => void): () => void
 }
 
 declare global {

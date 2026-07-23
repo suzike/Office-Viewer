@@ -4,6 +4,10 @@ import { dirname, join } from 'node:path'
 import type {
   DesktopAiAssistantSettings,
   DesktopAiAssistantSettingsInput,
+  DesktopAiCustomAction,
+  DesktopAiModelParameters,
+  DesktopAiPromptProfile,
+  DesktopAiPromptSnippet,
   DesktopAiProvider,
   DesktopAiProviderInput,
   DesktopAiProviderKind,
@@ -15,6 +19,8 @@ const MAX_SETTINGS_BYTES = 1024 * 1024
 const MIN_CONTEXT_CHARACTERS = 8_000
 const MAX_CONTEXT_CHARACTERS = 500_000
 const DEFAULT_CONTEXT_CHARACTERS = 160_000
+const MAX_CUSTOM_ACTIONS = 50
+const MAX_PROMPT_SNIPPETS = 100
 
 export interface AiAssistantSecretProtector {
   isAvailable(): boolean
@@ -33,6 +39,11 @@ interface PersistedSettings {
   readonly activeProviderId: string
   readonly contextCharacterLimit: number
   readonly providers: readonly PersistedProvider[]
+  readonly customActions: readonly DesktopAiCustomAction[]
+  readonly promptLibrary: readonly DesktopAiPromptSnippet[]
+  readonly promptProfile: DesktopAiPromptProfile
+  readonly globalShortcutEnabled: boolean
+  readonly modelParameters: DesktopAiModelParameters
 }
 
 const DEFAULT_PROVIDERS: readonly PersistedProvider[] = [
@@ -62,6 +73,11 @@ export class AiAssistantSettingsService {
     return {
       activeProviderId,
       contextCharacterLimit: persisted?.contextCharacterLimit ?? DEFAULT_CONTEXT_CHARACTERS,
+      customActions: persisted?.customActions ?? [],
+      promptLibrary: persisted?.promptLibrary ?? [],
+      promptProfile: persisted?.promptProfile ?? {},
+      globalShortcutEnabled: persisted?.globalShortcutEnabled === true,
+      modelParameters: persisted?.modelParameters ?? {},
       providers: providers.map((provider) => ({
         ...provider,
         hasApiKey: Boolean(secrets[provider.id]),
@@ -88,11 +104,29 @@ export class AiAssistantSettingsService {
       throw new Error('The selected AI provider no longer exists.')
     }
     const contextCharacterLimit = normalizeContextLimit(input.contextCharacterLimit)
+    const customActions = input.customActions === undefined
+      ? current.customActions
+      : validateCustomActionInputs(input.customActions)
+    const promptLibrary = input.promptLibrary === undefined
+      ? current.promptLibrary
+      : validatePromptSnippetInputs(input.promptLibrary)
+    const promptProfile = input.promptProfile === undefined
+      ? current.promptProfile
+      : validatePromptProfile(input.promptProfile)
+    const globalShortcutEnabled = input.globalShortcutEnabled ?? current.globalShortcutEnabled
+    const modelParameters = input.modelParameters === undefined
+      ? current.modelParameters
+      : validateModelParameters(input.modelParameters)
     await this.writeSecrets(nextSecrets)
     const payload: PersistedSettings = {
       version: 1,
       activeProviderId,
       contextCharacterLimit,
+      customActions,
+      promptLibrary,
+      promptProfile,
+      globalShortcutEnabled,
+      modelParameters,
       providers: providers.map(({ hasApiKey: _hasApiKey, ...provider }) => provider),
     }
     await writeJsonAtomically(this.settingsPath, payload)
@@ -121,6 +155,11 @@ export class AiAssistantSettingsService {
         version: 1,
         activeProviderId: typeof parsed.activeProviderId === 'string' ? parsed.activeProviderId : 'codex-local',
         contextCharacterLimit: normalizeContextLimit(parsed.contextCharacterLimit),
+        customActions: readPersistedArray(parsed.customActions, MAX_CUSTOM_ACTIONS, validateCustomAction),
+        promptLibrary: readPersistedArray(parsed.promptLibrary, MAX_PROMPT_SNIPPETS, validatePromptSnippet),
+        promptProfile: readPersistedPromptProfile(parsed.promptProfile),
+        globalShortcutEnabled: parsed.globalShortcutEnabled === true,
+        modelParameters: readPersistedModelParameters(parsed.modelParameters),
         providers,
       }
     } catch {
@@ -211,6 +250,119 @@ function validatePersistedProviders(values: readonly unknown[]): PersistedProvid
     }
   }
   return result
+}
+
+function validateCustomActionInputs(inputs: readonly DesktopAiCustomAction[]): DesktopAiCustomAction[] {
+  if (!Array.isArray(inputs) || inputs.length > MAX_CUSTOM_ACTIONS) {
+    throw new RangeError(`Configure at most ${MAX_CUSTOM_ACTIONS} custom quick actions.`)
+  }
+  const seen = new Set<string>()
+  return inputs.map((input) => {
+    const action = validateCustomAction(input)
+    if (seen.has(action.id)) throw new Error(`Duplicate custom quick action id: ${action.id}`)
+    seen.add(action.id)
+    return action
+  })
+}
+
+function validateCustomAction(value: unknown): DesktopAiCustomAction {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Custom quick action must be an object.')
+  const input = value as Record<string, unknown>
+  return {
+    id: requireIdentifier(input.id, 'Custom quick action id'),
+    label: requireText(input.label, 'Custom quick action label', 80),
+    description: optionalText(input.description, 'Custom quick action description', 160),
+    prompt: requireText(input.prompt, 'Custom quick action prompt', 4_000),
+    requiresSelection: input.requiresSelection === true,
+  }
+}
+
+function validatePromptSnippetInputs(inputs: readonly DesktopAiPromptSnippet[]): DesktopAiPromptSnippet[] {
+  if (!Array.isArray(inputs) || inputs.length > MAX_PROMPT_SNIPPETS) {
+    throw new RangeError(`Configure at most ${MAX_PROMPT_SNIPPETS} prompt library entries.`)
+  }
+  const seen = new Set<string>()
+  return inputs.map((input) => {
+    const snippet = validatePromptSnippet(input)
+    if (seen.has(snippet.id)) throw new Error(`Duplicate prompt library entry id: ${snippet.id}`)
+    seen.add(snippet.id)
+    return snippet
+  })
+}
+
+function validatePromptSnippet(value: unknown): DesktopAiPromptSnippet {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Prompt library entry must be an object.')
+  const input = value as Record<string, unknown>
+  return {
+    id: requireIdentifier(input.id, 'Prompt library entry id'),
+    title: requireText(input.title, 'Prompt library entry title', 80),
+    content: requireText(input.content, 'Prompt library entry content', 16_000),
+  }
+}
+
+function validatePromptProfile(value: unknown): DesktopAiPromptProfile {
+  if (value === undefined || value === null) return {}
+  if (typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Assistant prompt profile must be an object.')
+  const input = value as Record<string, unknown>
+  return {
+    persona: optionalText(input.persona, 'Assistant persona', 1_000),
+    outputLanguage: optionalText(input.outputLanguage, 'Assistant output language', 80),
+    style: optionalText(input.style, 'Assistant response style', 500),
+  }
+}
+
+function readPersistedArray<T>(value: unknown, maximum: number, validate: (entry: unknown) => T): T[] {
+  if (!Array.isArray(value)) return []
+  const result: T[] = []
+  for (const entry of value.slice(0, maximum)) {
+    try {
+      result.push(validate(entry))
+    } catch {
+      // Ignore one malformed entry without discarding the rest of the settings file.
+    }
+  }
+  return result
+}
+
+function readPersistedPromptProfile(value: unknown): DesktopAiPromptProfile {
+  try {
+    return validatePromptProfile(value)
+  } catch {
+    return {}
+  }
+}
+
+const MIN_MAX_TOKENS = 1
+const MAX_MAX_TOKENS = 1_000_000
+
+function validateModelParameters(value: unknown): DesktopAiModelParameters {
+  if (value === undefined || value === null) return {}
+  if (typeof value !== 'object' || Array.isArray(value)) throw new TypeError('AI model parameters must be an object.')
+  const input = value as Record<string, unknown>
+  const parameters: { temperature?: number; maxTokens?: number } = {}
+  if (input.temperature !== undefined && input.temperature !== null && input.temperature !== '') {
+    const temperature = Number(input.temperature)
+    if (!Number.isFinite(temperature) || temperature < 0 || temperature > 2) {
+      throw new RangeError('AI temperature must be between 0 and 2.')
+    }
+    parameters.temperature = temperature
+  }
+  if (input.maxTokens !== undefined && input.maxTokens !== null && input.maxTokens !== '') {
+    const maxTokens = Number(input.maxTokens)
+    if (!Number.isInteger(maxTokens) || maxTokens < MIN_MAX_TOKENS || maxTokens > MAX_MAX_TOKENS) {
+      throw new RangeError(`AI max tokens must be an integer between ${MIN_MAX_TOKENS} and ${MAX_MAX_TOKENS}.`)
+    }
+    parameters.maxTokens = maxTokens
+  }
+  return parameters
+}
+
+function readPersistedModelParameters(value: unknown): DesktopAiModelParameters {
+  try {
+    return validateModelParameters(value)
+  } catch {
+    return {}
+  }
 }
 
 function requireProviderKind(value: unknown): DesktopAiProviderKind {

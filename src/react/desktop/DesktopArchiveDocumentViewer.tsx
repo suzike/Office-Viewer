@@ -1,12 +1,17 @@
 import { Alert, Spin } from 'antd';
-import { lazy, Suspense, useCallback, useLayoutEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { DesktopFileSession } from '../../../desktop/shared/desktop-api';
-import { dispatchHostMessage, installOfficeHostBridge, type OfficeHostBridge } from '../util/vscode';
+import { dispatchHostMessage, installOfficeHostBridge, type OfficeHostBridge, type OfficeHostBridgeHandle } from '../util/vscode';
 
 const Zip = lazy(() => import('../view/compress/Zip'));
 
-export default function DesktopArchiveDocumentViewer({ session }: { session: DesktopFileSession }) {
+export default function DesktopArchiveDocumentViewer({ session, active = true }: { session: DesktopFileSession; active?: boolean }) {
     const [error, setError] = useState<string>();
+    const bridgeHandleRef = useRef<OfficeHostBridgeHandle>();
+
+    useLayoutEffect(() => {
+        if (active) bridgeHandleRef.current?.activate();
+    }, [active]);
     const emitArchive = useCallback(async (encoding?: string) => {
         setError(undefined);
         try {
@@ -88,7 +93,12 @@ export default function DesktopArchiveDocumentViewer({ session }: { session: Des
                 }
             },
         };
-        return installOfficeHostBridge(bridge);
+        const uninstall = installOfficeHostBridge(bridge);
+        bridgeHandleRef.current = uninstall;
+        return () => {
+            bridgeHandleRef.current = undefined;
+            uninstall();
+        };
     }, [emitArchive, session.id]);
 
     if (error) {

@@ -204,7 +204,7 @@ export default function Word() {
             >
                 {adaptiveColorMode ? <SunOutlined /> : <MoonOutlined />}
             </button>
-            <Spin spinning={loading} fullscreen />
+            {loading && <Spin fullscreen />}
             {error && <Alert type="error" message={error} showIcon style={{ margin: 16 }} />}
             {readOnly && !loading && !error && (documentBuffer || parsedDocument) && (
                 <div className="word-readonly-banner">Read-only — edits will be saved to a new file</div>

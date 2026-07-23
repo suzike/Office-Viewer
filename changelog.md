@@ -1,5 +1,137 @@
 # Change log
 
+# 0.5.6 Feature Batch 3: Inspection, Templates and Assistant Depth 2026-7-23
+
+This release lands the third feature batch from the three module roadmaps (docs/plans/): 13 new features across HTML, Markdown and the AI assistant.
+
+Desktop application:
+
+- Disable background throttling on the main window: exports reveal their output in File Explorer, which can fully cover the app window, and Windows occlusion tracking then froze rAF/IntersectionObserver — editors, virtualized views and animations appeared dead while the process was alive.
+
+HTML module:
+
+- Local HTML validation (问题 panel): unclosed/mismatched tags, duplicate ids and deprecated tags with line numbers; clicking an issue jumps to the CodeMirror source line.
+- Network request waterfall: per-resource start/duration bars colored by type, as a view toggle inside the resource panel.
+- Dark mode simulation: rewrite prefers-color-scheme media queries plus a matchMedia patch, with 跟随系统 / 强制浅色 / 强制深色 toolbar modes.
+- JS disable switch: reloads the preview with `script-src 'none'` CSP and reveals noscript content.
+- In-preview text find (Ctrl+F): highlighted matches, counter and previous/next navigation inside the iframe.
+
+Markdown module:
+
+- Mermaid render error panel: failed diagrams show a structured inline error block with the failing line number, details and the offending source line.
+- Dead-link and missing-image scanner (检查死链): scans relative links and image references, reports missing targets in a host panel, click to reveal the line in the editor.
+- Template system (从模板插入): built-in templates (blank / meeting notes / weekly report / README) plus user templates from a userData directory; inserting replaces the content and marks the document dirty.
+- Fix: inserting generated content (templates, AI TOC/summary) now re-enables the toolbar save button.
+
+AI assistant:
+
+- Edit and resend history messages: inline editing on user bubbles, truncates later turns and re-attaches the original selection snapshot.
+- Ollama model discovery: the model field offers a datalist from the probed /api/tags model list, falling back to free input.
+- Model parameters: global temperature / maxTokens settings injected per protocol (OpenAI, Anthropic, Gemini, Ollama; CLI providers ignored).
+- Pre-send sensitive data detection: private keys, tokens, AWS keys, e-mails and Chinese ID numbers (checksum-validated) trigger a masked confirmation bar before sending.
+- Settings dialog restructured into four tabs: 常规 / Provider / 动作 / 关于.
+
+# 0.5.5 Feature Batch 2: Debug Tooling, Writing Modes and Assistant Upgrades 2026-7-23
+
+This release lands the second feature batch from the three module roadmaps (docs/plans/): 16 new features across HTML, Markdown and the AI assistant.
+
+Desktop application:
+
+- Fix the Word editor swallowing the first click after loading: the antd fullscreen Spin mask stayed mounted while fading out and intercepted hit-testing, so fast clicks never reached the editor (Word.tsx now unmounts the mask as soon as loading ends).
+
+HTML module:
+
+- Console panel: captures console log/warn/error plus uncaught exceptions from the sandboxed preview through an injected inspector bridge, level-colored and clearable.
+- Resource list panel: name/type/size/duration/status of page resources (PerformanceResourceTiming with a DOM-scan fallback for opaque origins).
+- Performance metrics bar: DCL / FCP / LCP / resource count and total bytes via PerformanceObserver.
+- Responsive device presets: Desktop / iPhone 390×844 / iPad 820×1180 / custom size with a device frame, coexisting with the 50–200% preview zoom.
+- Full-page screenshot PNG export (导出 PNG) through the hidden-window capturePage pipeline, written next to the source file.
+
+Markdown module:
+
+- Export plain text (导出纯文本): strips Markdown syntax (front-matter optional) and writes a .txt next to the source file.
+- Focus mode (专注模式): typewriter scrolling with the current block highlighted.
+- Zen mode (禅模式): distraction-free fullscreen, ESC to exit.
+- Drag any file into the editor to insert a relative `[name](path)` link; images still go through the image service.
+- AI one-click TOC / summary generation (AI 生成目录 / AI 生成摘要) inserted at the top of the document through the streaming polish pipeline.
+
+AI assistant:
+
+- Selection floating action bar (解释 / 翻译 / 引用到助手) over the text, Markdown and HTML viewers, wired through a cross-iframe selection bus.
+- Custom quick actions: create, edit and reorder in the settings dialog, merged into the quick-action bar and the slash-command palette.
+- Prompt library: save frequent prompts and insert them into the composer from a panel.
+- Global invoke shortcut (Ctrl+Shift+Space, toggleable) focuses the main window and opens the assistant panel.
+- Real network probing for HTTP providers: latency and model lists (/v1/models, Ollama /api/tags) shown in the settings dialog.
+- Custom system prompt profile: persona / output language / style injected ahead of the safety rules.
+
+# 0.5.4 Feature Batch 1: Markdown, HTML and AI Assistant 2026-7-23
+
+This release lands the first feature batch from the three module roadmaps (docs/plans/).
+
+Markdown module:
+
+- Print the current document (context menu 打印 / Ctrl+Cmd+P) through a hidden sandboxed print window.
+- Export long-image PNG (导出长图): full-page rendering of the document next to the source file.
+- One-click TOC toolbar button: inserts or updates a `[toc]` marker (fence-aware, idempotent).
+- Live word count chip: CJK-aware 字数/词数/预计阅读时长, debounced, in the editor corner.
+
+HTML module:
+
+- CodeMirror 6 source editor replacing the plain textarea: HTML highlighting, auto close tags/brackets, line numbers, search keymap.
+- Format source button (built-in indentation formatter, desktop/shared/html-format.ts).
+- Preview zoom control (50–200%) and an insert-snippet menu with six templates (tab stops).
+- Export PDF via a new hidden-window IPC pipeline (`office-desktop:html:export-pdf`).
+
+AI assistant:
+
+- Regenerate the last answer; export the conversation as Markdown; per-message latency/size stats (first-token/total time, characters).
+- Context extraction indicator in the context bar (strategy, extracted/source characters, truncation badge).
+- Slash commands in the composer ('/' opens the quick-action palette with keyboard navigation).
+- Five new built-in quick actions: 改写语气, 压缩篇幅, 生成会议纪要, SWOT 分析, 对比选段与全文.
+
+# 0.5.3 Tahoe Polish and Interaction Fixes 2026-7-23
+
+Desktop application:
+
+- Fix a data-loss class of bugs where the global Office host bridge let a hidden document's save route to the wrong session or silently no-op; bridges are now an activation stack driven by the visible document.
+- Make the dirty-close confirmation compute against fresh document state so confirming can no longer discard tabs opened while the dialog was up.
+- Restore window dragging on the frameless window (`-webkit-app-region` on the title bar) and stop text drags from triggering the file drop overlay.
+- Fix document tabs and recent files appearing dead while Git History is open; opening files, tabs or recents now leaves Git History.
+- Keep assistant conversations per document: opening Git History no longer aborts in-flight requests or wipes the chat, and selections inside Git History no longer leak into prompts.
+- Close app menus on outside click, surface open/sync errors with a document open (floating banner), and re-register recent files on reopen so metadata and watchers refresh (new `openPaths` IPC).
+- Assistant: throttle streaming Markdown re-renders (memo + deferred), stop forced scroll-to-bottom while reading, retry without duplicating the user bubble (and keep the original selection context), open reply links externally, disable quick actions for unavailable providers, and clean up resize listeners on pointer cancel.
+- Show the real app version (injected from package.json at build time) in the About dialog.
+
+Design (macOS 26 Tahoe / Liquid Glass):
+
+- Add specular highlights, deeper translucency, larger corner radii (8/10/16px) and spring motion curves across the shell and assistant.
+- Float the tab strip and metadata bar as rounded glass islands; smooth 300 ms light/dark theme crossfade; menu/message pop-in animations.
+- Enable Windows 11 Mica window material (gated by build 22621+) with a transparent-shell fallback for other platforms.
+- Refine typography toward macOS defaults and switch icons to a lighter 1.5px stroke with a rounded app mark.
+
+# 0.5.2 macOS Design Language Redesign 2026-7-23
+
+Desktop application:
+
+- Completely redesign the desktop shell with an Apple macOS design language: system color palette (light `#f5f5f7` / dark `#1e1e20`), macOS blue accent, SF-style system font stack, unified corner-radius scale and soft ambient shadows.
+- Style the frameless window controls as macOS traffic lights with hover glyphs and pressed feedback.
+- Restyle menus as frosted rounded popovers, document tabs as Safari-style floating capsules, and file-type tokens as tinted rounded badges.
+- Rework the welcome screen, metadata bar and status bar with Finder/inspector-inspired typography, frosted translucency and macOS focus rings and transitions.
+- Rebuild the AI assistant launcher, panel, chat bubbles and settings dialog in a macOS Notification Center style.
+- Add a desktop-only Ant Design theme so dialogs and inputs match the macOS shell without affecting the VS Code extension.
+- Re-map viewer theme variables so embedded document viewers follow the desktop light/dark macOS theme.
+
+AI assistant:
+
+- Fix Claude Code requests always failing: `--print --output-format stream-json` now passes the required `--verbose` flag.
+- Retry CLI requests once without version-specific flags (`--safe-mode`, `--ignore-user-config`, `--ignore-rules`) when an older CLI rejects them.
+- Surface Codex stdout error events (`turn.failed`, non-transient `error`) in the UI instead of a generic exit-code message.
+- Skip redundant Claude assistant/result snapshots after streamed deltas so responses no longer appear duplicated.
+- Pass proxy, API-key and certificate environment variables through to local CLI providers.
+- Discover Codex and Claude executables in more install layouts (Codex desktop `bin` directories, `%USERPROFILE%\.local\bin`).
+- Show the probe failure reason next to unavailable local providers instead of only disabling the send button.
+- Render assistant replies as rich Markdown (headings, lists, tables, syntax-highlighted code blocks, quotes) instead of plain pre-wrapped text, using markdown-it with raw HTML escaped.
+
 # 0.5.1 Desktop Layout Hotfix 2026-7-22
 
 Desktop application:

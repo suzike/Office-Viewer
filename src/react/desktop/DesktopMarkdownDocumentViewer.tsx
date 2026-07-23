@@ -3,9 +3,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
     DesktopFileSession,
     DesktopMarkdownAiOptions,
+    DesktopMarkdownDeadLink,
     DesktopMarkdownPreferences,
     DesktopMarkdownViewerSettings,
 } from '../../../desktop/shared/desktop-api';
+import { publishAssistantSelection } from '../../desktop/assistant/selectionEvents';
 
 interface Props {
     session: DesktopFileSession;
@@ -44,10 +46,12 @@ export default function DesktopMarkdownDocumentViewer({
     const loadedSessionRef = useRef<string>();
     const preferencesRef = useRef<DesktopMarkdownPreferences>();
     const aiRequestRef = useRef<string>();
+    const aiGenerateRef = useRef<{ kind: 'toc' | 'summary'; chunks: string[] }>();
     const [sourceText, setSourceText] = useState('');
     const [sourceMode, setSourceMode] = useState(false);
     const [error, setError] = useState<string>();
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [deadLinks, setDeadLinks] = useState<readonly DesktopMarkdownDeadLink[]>();
     const [settingsSaving, setSettingsSaving] = useState(false);
     const [preferences, setPreferences] = useState<DesktopMarkdownPreferences>();
     const [settingsDraft, setSettingsDraft] = useState<MarkdownPreferenceDraft>({
@@ -198,15 +202,23 @@ export default function DesktopMarkdownDocumentViewer({
 
     useEffect(() => window.officeDesktop.onMarkdownAiEvent((event) => {
         if (event.sessionId !== session.id || event.requestId !== aiRequestRef.current) return;
+        const generating = aiGenerateRef.current;
         if (event.type === 'chunk') {
-            postToEditor('aiPolishChunk', event.content ?? '');
+            if (generating) generating.chunks.push(event.content ?? '');
+            else postToEditor('aiPolishChunk', event.content ?? '');
         } else if (event.type === 'end') {
             aiRequestRef.current = undefined;
-            postToEditor('aiPolishEnd');
+            if (generating) {
+                aiGenerateRef.current = undefined;
+                postToEditor('insertGeneratedContent', { kind: generating.kind, content: generating.chunks.join('') });
+            } else {
+                postToEditor('aiPolishEnd');
+            }
         } else {
             aiRequestRef.current = undefined;
+            aiGenerateRef.current = undefined;
             postToEditor('aiPolishEnd');
-            setError(event.content || 'AI 润色失败');
+            setError(event.content || (generating ? 'AI 生成失败' : 'AI 润色失败'));
         }
     }), [postToEditor, session.id]);
 
@@ -305,6 +317,52 @@ export default function DesktopMarkdownDocumentViewer({
                 case 'export':
                     void exportMarkdown(content);
                     break;
+                case 'print':
+                    void printCurrentDocument();
+                    break;
+                case 'exportImage':
+                    void exportLongImage();
+                    break;
+                case 'exportText':
+                    void exportPlainText();
+                    break;
+                case 'scanDeadLinks':
+                    void window.officeDesktop.scanMarkdownDeadLinks(session.id, asText(content))
+                        .then((missing) => setDeadLinks(missing))
+                        .catch(showError);
+                    break;
+                case 'requestTemplates':
+                    void window.officeDesktop.loadMarkdownTemplates()
+                        .then((templates) => postToEditor('markdownTemplates', templates))
+                        .catch(showError);
+                    break;
+                case 'dropFiles': {
+                    const files = Array.isArray(content) ? content.filter((item): item is File => item instanceof File) : [];
+                    if (files.length > 0) {
+                        void window.officeDesktop.markdownDropFileLinks(session.id, files)
+                            .then((markdown) => { if (markdown) postToEditor('insertImageMarkdown', markdown); })
+                            .catch(showError);
+                    }
+                    break;
+                }
+                case 'assistantSelection': {
+                    // The vditor iframe forwards its DOM selection for the
+                    // assistant floating toolbar; map it into viewport space.
+                    const payload = content as { text?: unknown; rect?: { left: number; top: number; width: number; height: number } | null } | undefined;
+                    const frame = frameRef.current;
+                    if (!frame) break;
+                    const bounds = frame.getBoundingClientRect();
+                    const rect = payload?.rect ?? null;
+                    publishAssistantSelection({
+                        text: asText(payload?.text),
+                        x: rect ? bounds.left + rect.left + rect.width / 2 : bounds.left + bounds.width / 2,
+                        y: rect ? bounds.top + rect.top : bounds.top,
+                    });
+                    break;
+                }
+                case 'aiGenerate':
+                    void startAiGenerate(content);
+                    break;
                 case 'aiPolish':
                     void startAiPolish(content);
                     break;
@@ -354,6 +412,50 @@ export default function DesktopMarkdownDocumentViewer({
                 showError(reason);
             }
         };
+        const printCurrentDocument = async () => {
+            try {
+                await save(latestTextRef.current);
+                await window.officeDesktop.printMarkdown(session.id, latestTextRef.current);
+            } catch (reason) {
+                showError(reason);
+            }
+        };
+        const exportLongImage = async () => {
+            try {
+                await save(latestTextRef.current);
+                await window.officeDesktop.exportMarkdownImage(session.id, latestTextRef.current);
+            } catch (reason) {
+                showError(reason);
+            }
+        };
+        const exportPlainText = async () => {
+            try {
+                await save(latestTextRef.current);
+                await window.officeDesktop.exportMarkdownText(session.id, latestTextRef.current);
+            } catch (reason) {
+                showError(reason);
+            }
+        };
+        const startAiGenerate = async (rawPayload: unknown) => {
+            const payload = rawPayload as { kind?: unknown; markdown?: unknown; options?: DesktopMarkdownAiOptions } | undefined;
+            const kind = payload?.kind === 'summary' ? 'summary' : 'toc';
+            const markdown = asText(payload?.markdown);
+            if (!markdown) return;
+            const previous = aiRequestRef.current;
+            if (previous) await window.officeDesktop.cancelMarkdownAiPolish(previous).catch(() => false);
+            const requestId = crypto.randomUUID();
+            aiRequestRef.current = requestId;
+            aiGenerateRef.current = { kind, chunks: [] };
+            try {
+                await window.officeDesktop.startMarkdownAiPolish(session.id, requestId, markdown, { ...(payload?.options ?? {}), task: kind });
+            } catch (reason) {
+                if (aiRequestRef.current === requestId) {
+                    aiRequestRef.current = undefined;
+                    aiGenerateRef.current = undefined;
+                    showError(reason);
+                }
+            }
+        };
         const startAiPolish = async (rawPayload: unknown) => {
             const payload = rawPayload as { markdown?: unknown; options?: DesktopMarkdownAiOptions } | undefined;
             const markdown = asText(payload?.markdown);
@@ -377,6 +479,7 @@ export default function DesktopMarkdownDocumentViewer({
             window.removeEventListener('message', receive);
             const requestId = aiRequestRef.current;
             aiRequestRef.current = undefined;
+            aiGenerateRef.current = undefined;
             if (requestId) void window.officeDesktop.cancelMarkdownAiPolish(requestId).catch(() => false);
         };
     }, [initializeEditor, markDirty, openDesktopSettings, postToEditor, save, session.id]);
@@ -417,6 +520,45 @@ export default function DesktopMarkdownDocumentViewer({
                 title={session.name}
                 sandbox="allow-scripts allow-same-origin"
             />
+            {deadLinks && (
+                <div className="desktop-markdown-settings-backdrop" role="presentation" onMouseDown={(event) => {
+                    if (event.target === event.currentTarget) setDeadLinks(undefined);
+                }}>
+                    <section className="desktop-markdown-settings desktop-markdown-deadlinks" role="dialog" aria-modal="true" aria-labelledby="desktop-markdown-deadlinks-title">
+                        <header>
+                            <div>
+                                <strong id="desktop-markdown-deadlinks-title">死链检查报告</strong>
+                                <span>相对链接与图片引用的文件存在性</span>
+                            </div>
+                            <button type="button" aria-label="关闭死链检查报告" onClick={() => setDeadLinks(undefined)}>×</button>
+                        </header>
+                        <div className="desktop-markdown-settings__body desktop-markdown-deadlinks__body">
+                            {deadLinks.length === 0 ? (
+                                <p className="desktop-markdown-deadlinks__empty">未发现缺失的链接或图片。</p>
+                            ) : (
+                                <ul className="desktop-markdown-deadlinks__list">
+                                    {deadLinks.map((item, index) => (
+                                        <li key={`${item.line}:${item.target}:${index}`}>
+                                            <button
+                                                type="button"
+                                                onClick={() => postToEditor('revealDeadLink', { target: item.target })}
+                                                title="点击定位到文档中的引用位置"
+                                            >
+                                                <span className="desktop-markdown-deadlinks__line">第 {item.line} 行</span>
+                                                <span className="desktop-markdown-deadlinks__target">{item.target}</span>
+                                                <span className="desktop-markdown-deadlinks__kind">{item.kind === 'image' ? '图片' : '链接'}</span>
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                        <footer>
+                            <button type="button" onClick={() => setDeadLinks(undefined)}>关闭</button>
+                        </footer>
+                    </section>
+                </div>
+            )}
             {settingsOpen && (
                 <div className="desktop-markdown-settings-backdrop" role="presentation" onMouseDown={(event) => {
                     if (event.target === event.currentTarget && !settingsSaving) setSettingsOpen(false);

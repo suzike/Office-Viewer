@@ -1,12 +1,15 @@
 import { readFile, realpath, stat } from 'node:fs/promises'
+import { release as osRelease } from 'node:os'
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   app,
   BrowserWindow,
   dialog,
+  globalShortcut,
   net,
   protocol,
+  safeStorage,
   type IpcMainEvent,
   type IpcMainInvokeEvent,
 } from 'electron'
@@ -16,12 +19,15 @@ import type {
   DesktopOpenReason,
 } from '../shared/desktop-api'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
+import { AiAssistantSettingsService } from './ai-assistant-settings-service'
 import { FileSessionManager } from './file-session-manager'
+import { injectHtmlInspector, injectNoscriptStyle } from './html-inspector-script'
 import { registerIpcHandlers } from './ipc-handlers'
 import { resolveMarkdownWorkspaceResource } from './markdown-resource-service'
 
 const APP_USER_MODEL_ID = 'com.officeviewer.desktop'
 const MAX_PENDING_OPEN_EVENTS = 100
+const ASSISTANT_GLOBAL_ACCELERATOR = 'CommandOrControl+Shift+Space'
 const PDF_VIEWER_SCHEME = 'office-pdf'
 const HTML_VIEWER_SCHEME = 'office-html'
 const MARKDOWN_VIEWER_SCHEME = 'office-markdown'
@@ -115,6 +121,7 @@ function configureApplicationLifecycle(): void {
     removeIpcHandlers?.()
     removeIpcHandlers = undefined
     sessions.dispose()
+    globalShortcut.unregisterAll()
   })
 
   app.on('window-all-closed', () => {
@@ -136,6 +143,7 @@ function configureApplicationLifecycle(): void {
     configureImageDecoderProtocol()
     configureIpc()
     createMainWindow()
+    configureAssistantGlobalShortcut()
 
     const initialArguments = process.argv.slice(app.isPackaged ? 1 : 2)
     await openCommandLineFiles(initialArguments, process.cwd(), 'startup')
@@ -279,9 +287,14 @@ function configureHtmlViewerProtocol(): void {
 
       const response = await net.fetch(pathToFileURL(realCandidate).href)
       const headers = new Headers(response.headers)
+      // Reloading with ?js=0 disables scripting entirely: the CSP blocks every
+      // script (including the inspector bridge) and noscript content is shown.
+      const scriptingDisabled = url.searchParams.get('js') === '0'
       headers.set('Content-Security-Policy', [
         "default-src office-html: data: blob:",
-        "script-src office-html: 'unsafe-inline' 'unsafe-eval' blob:",
+        scriptingDisabled
+          ? "script-src 'none'"
+          : "script-src office-html: 'unsafe-inline' 'unsafe-eval' blob:",
         "style-src office-html: 'unsafe-inline' data: blob:",
         'img-src office-html: data: blob:',
         'font-src office-html: data:',
@@ -293,7 +306,20 @@ function configureHtmlViewerProtocol(): void {
         "base-uri 'none'",
         "form-action 'none'",
       ].join('; '))
+      // The preview iframe runs in an opaque origin; allow it to read full
+      // resource timing (sizes/durations) for the debug panels.
+      headers.set('Timing-Allow-Origin', '*')
       headers.set('X-Content-Type-Options', 'nosniff')
+      if (/\.(?:html?|xhtml)$/i.test(realCandidate)) {
+        const text = await response.text()
+        const html = scriptingDisabled ? injectNoscriptStyle(text) : injectHtmlInspector(text)
+        headers.set('Content-Type', 'text/html; charset=utf-8')
+        return new Response(html, {
+          status: response.status,
+          statusText: response.statusText,
+          headers,
+        })
+      }
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
@@ -437,6 +463,9 @@ function configureIpc(): void {
     setRendererDirtyState: (dirty) => {
       rendererDirty = dirty
     },
+    onAssistantSettingsSaved: (settings) => {
+      applyAssistantGlobalShortcut(settings.globalShortcutEnabled)
+    },
   })
 
   sessions.onDidChange((event) => {
@@ -444,6 +473,33 @@ function configureIpc(): void {
       mainWindow.webContents.send(IPC_CHANNELS.fileChanged, event)
     }
   })
+}
+
+/** Registers the global summon shortcut when enabled in the assistant settings. */
+function configureAssistantGlobalShortcut(): void {
+  const settings = new AiAssistantSettingsService(app.getPath('userData'), {
+    isAvailable: () => safeStorage.isEncryptionAvailable(),
+    encrypt: (value) => safeStorage.encryptString(value),
+    decrypt: (value) => safeStorage.decryptString(Buffer.from(value)),
+  })
+  void settings.load()
+    .then((loaded) => applyAssistantGlobalShortcut(loaded.globalShortcutEnabled))
+    .catch(() => applyAssistantGlobalShortcut(false))
+}
+
+function applyAssistantGlobalShortcut(enabled: boolean): void {
+  globalShortcut.unregister(ASSISTANT_GLOBAL_ACCELERATOR)
+  if (!enabled) return
+  try {
+    globalShortcut.register(ASSISTANT_GLOBAL_ACCELERATOR, () => {
+      focusMainWindow()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(IPC_CHANNELS.aiAssistantFocus)
+      }
+    })
+  } catch {
+    // A conflicting or unsupported accelerator must never crash startup.
+  }
 }
 
 function createMainWindow(): void {
@@ -454,6 +510,12 @@ function createMainWindow(): void {
   rendererReady = false
   rendererDirty = false
   forceWindowClose = false
+  // Windows 11 22H2+ (build 22621): let the Mica material bleed through the shell
+  // chrome. The renderer reads OFFICE_WINDOW_MATERIAL via preload and makes the
+  // shell background transparent while keeping document surfaces opaque.
+  const windowsBuild = process.platform === 'win32' ? Number(osRelease().split('.')[2] ?? 0) : 0
+  const windowMaterial = process.platform === 'win32' && windowsBuild >= 22621 ? 'mica' as const : undefined
+  if (windowMaterial) process.env.OFFICE_WINDOW_MATERIAL = windowMaterial
   const window = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -461,8 +523,10 @@ function createMainWindow(): void {
     minHeight: 560,
     show: false,
     autoHideMenuBar: true,
+    frame: false,
     title: 'Office Viewer',
     icon: resolve(app.getAppPath(), 'image/logo.png'),
+    ...(windowMaterial ? { backgroundMaterial: windowMaterial } : {}),
     webPreferences: {
       preload: resolve(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -473,6 +537,10 @@ function createMainWindow(): void {
       webviewTag: false,
       navigateOnDragDrop: false,
       safeDialogs: true,
+      // Exports reveal their output in File Explorer, which can fully cover this
+      // window; Windows occlusion tracking would then freeze rAF/IntersectionObserver
+      // and make the app (and its editors) appear dead while still interactive.
+      backgroundThrottling: false,
     },
   })
   mainWindow = window

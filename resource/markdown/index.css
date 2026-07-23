@@ -42,6 +42,8 @@ html {
     --ctx-icon-docx: var(--vscode-charts-blue, #3794ff);
     --ctx-icon-html: var(--vscode-symbolIcon-stringForeground, #ce9178);
     --ctx-icon-folder: var(--vscode-symbolIcon-folderForeground, #dcb67a);
+    --ctx-icon-print: var(--vscode-charts-purple, #b180d7);
+    --ctx-icon-image: var(--vscode-charts-orange, #d18616);
 }
 
 .vditor-context-menu[hidden] {
@@ -160,6 +162,14 @@ body.is-web .vditor-context-menu__item--desktop-only:focus-visible {
     color: var(--vscode-textLink-foreground, #4a90d9);
 }
 
+.vditor-context-menu__item[data-action="print"] .codicon {
+    color: var(--ctx-icon-print);
+}
+
+.vditor-context-menu__item[data-action="longImageExport"] .codicon {
+    color: var(--ctx-icon-image);
+}
+
 .vditor-context-menu__label {
     flex: 1;
     overflow: hidden;
@@ -232,4 +242,128 @@ body.is-web .vditor-context-menu__item--desktop-only:focus-visible {
 
 .vditor-help-sponsor-text a:hover {
     text-decoration: underline;
+}
+
+.office-markdown-word-count {
+    position: fixed;
+    left: 16px;
+    bottom: 14px;
+    z-index: 90;
+    padding: 3px 12px;
+    border: 1px solid rgba(127, 127, 127, 0.28);
+    border-radius: 999px;
+    background: rgba(127, 127, 127, 0.12);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--front-color, #61666c);
+    font-size: 12px;
+    line-height: 18px;
+    font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+    white-space: nowrap;
+    opacity: 0.85;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* 批次 2：禅模式（隐藏工具栏/大纲等干扰元素，ESC 退出） */
+body.office-zen-mode .vditor-toolbar,
+body.office-zen-mode .vditor-outline,
+body.office-zen-mode .office-markdown-word-count {
+    display: none !important;
+}
+
+/* 批次 2：专注模式当前段落高亮 */
+.office-focus-current {
+    background: color-mix(in srgb, var(--toolbar-icon-hover-color, #4285f4) 9%, transparent);
+    border-radius: 4px;
+    transition: background 0.15s ease;
+}
+
+/* 批次 2：工具栏开关按钮的激活态 */
+.vditor-toolbar__item.office-toolbar-active button {
+    color: var(--toolbar-icon-hover-color, #4285f4);
+    background: color-mix(in srgb, var(--toolbar-icon-hover-color, #4285f4) 14%, transparent);
+}
+
+/* 批次 3：Mermaid 渲染错误面板 */
+.office-mermaid-error {
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--vscode-charts-red, #e51400) 45%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--vscode-charts-red, #e51400) 7%, transparent);
+    color: var(--front-color, #24292e);
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: normal;
+}
+
+.office-mermaid-error__title {
+    font-weight: 600;
+    color: var(--vscode-charts-red, #e51400);
+}
+
+.office-mermaid-error__detail {
+    margin-top: 4px;
+    opacity: 0.85;
+    word-break: break-all;
+}
+
+.office-mermaid-error__line {
+    display: block;
+    margin-top: 6px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(127, 127, 127, 0.14);
+    font-family: var(--code-font-family, monospace);
+}
+
+/* 批次 3：死链定位闪烁高亮 */
+.office-dead-link-flash {
+    outline: 2px solid var(--vscode-charts-red, #e51400) !important;
+    outline-offset: 2px;
+    border-radius: 3px;
+    transition: outline-color 1.4s ease;
+}
+
+/* 批次 3：模板选择面板 */
+.office-template-panel {
+    position: fixed;
+    z-index: 10000;
+    min-width: 180px;
+    max-width: min(280px, calc(100vw - 8px));
+    padding: 4px 0;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background-color: var(--second-bg-color);
+    color: var(--front-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    font-size: var(--vscode-font-size, 13px);
+    font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+    user-select: none;
+}
+
+.office-template-panel__hint {
+    padding: 4px 12px;
+    color: var(--vscode-descriptionForeground, #656d76);
+    font-size: 11px;
+}
+
+.office-template-panel__item {
+    display: block;
+    width: 100%;
+    min-height: 26px;
+    padding: 2px 12px;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.office-template-panel__item:hover,
+.office-template-panel__item:focus-visible {
+    background-color: var(--dropdown-hover-background);
+    outline: none;
 }

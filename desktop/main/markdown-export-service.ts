@@ -3,7 +3,8 @@ import { readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, extname, join, parse, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { BrowserWindow } from 'electron'
-import type { DesktopMarkdownExportResult, DesktopMarkdownPreferences } from '../shared/desktop-api'
+import type { DesktopMarkdownExportResult, DesktopMarkdownImageExportResult, DesktopMarkdownPreferences, DesktopMarkdownTextExportResult } from '../shared/desktop-api'
+import { markdownToPlainText } from './markdown-plain-text'
 
 const MarkdownIt = require('markdown-it') as typeof import('markdown-it')
 const markdownItAnchor = require('markdown-it-anchor')
@@ -18,6 +19,8 @@ const { parse: parseHtml } = require('node-html-parser') as typeof import('node-
 
 const MAX_MARKDOWN_CHARS = 8 * 1024 * 1024
 const MAX_EXPORT_BYTES = 256 * 1024 * 1024
+const IMAGE_EXPORT_WIDTH = 840
+const MAX_IMAGE_EXPORT_HEIGHT = 16_384
 
 export class MarkdownExportService {
   public constructor(private readonly applicationRoot: string) {}
@@ -48,6 +51,71 @@ export class MarkdownExportService {
       await atomicWrite(target, bytes)
     }
     return { type: option.type, path: target }
+  }
+
+  public async exportText(
+    markdownPath: string,
+    markdown: string,
+    option: { readonly keepFrontMatter?: boolean } = {},
+  ): Promise<DesktopMarkdownTextExportResult> {
+    if (!/\.(?:md|markdown)$/i.test(markdownPath)) throw new Error('Only Markdown documents can be exported.')
+    if (typeof markdown !== 'string' || markdown.length > MAX_MARKDOWN_CHARS) throw new RangeError('Markdown export input exceeds the 8 MB limit.')
+    const origin = parse(markdownPath)
+    const target = join(origin.dir, `${origin.name}.txt`)
+    await atomicWrite(target, Buffer.from(markdownToPlainText(markdown, option), 'utf8'))
+    return { path: target }
+  }
+
+  public async print(markdownPath: string, markdown: string): Promise<void> {
+    if (!/\.(?:md|markdown)$/i.test(markdownPath)) throw new Error('Only Markdown documents can be printed.')
+    if (typeof markdown !== 'string' || markdown.length > MAX_MARKDOWN_CHARS) throw new RangeError('Markdown print input exceeds the 8 MB limit.')
+    const html = await this.render(markdownPath, markdown, { type: 'pdf', withoutOutline: true })
+    const temporary = join(dirname(markdownPath), `.${parse(markdownPath).name}-${randomUUID()}.print.html`)
+    await writeFile(temporary, html, { flag: 'wx' })
+    const window = createExportWindow()
+    try {
+      await loadExportHtml(window, temporary)
+      await new Promise<void>((resolvePrint, rejectPrint) => {
+        window.webContents.print({ silent: false, printBackground: true }, (success, failureReason) => {
+          if (success || /cancel/i.test(failureReason ?? '')) {
+            resolvePrint()
+          } else {
+            rejectPrint(new Error(failureReason || 'The document could not be printed.'))
+          }
+        })
+      })
+    } finally {
+      if (!window.isDestroyed()) window.destroy()
+      await rm(temporary, { force: true })
+    }
+  }
+
+  public async exportImage(markdownPath: string, markdown: string): Promise<DesktopMarkdownImageExportResult> {
+    if (!/\.(?:md|markdown)$/i.test(markdownPath)) throw new Error('Only Markdown documents can be exported.')
+    if (typeof markdown !== 'string' || markdown.length > MAX_MARKDOWN_CHARS) throw new RangeError('Markdown export input exceeds the 8 MB limit.')
+    const origin = parse(markdownPath)
+    const target = join(origin.dir, `${origin.name}.png`)
+    const html = await this.render(markdownPath, markdown, { type: 'pdf', withoutOutline: true })
+    const temporary = join(origin.dir, `.${origin.name}-${randomUUID()}.image.html`)
+    await writeFile(temporary, html, { flag: 'wx' })
+    const window = createExportWindow(IMAGE_EXPORT_WIDTH, 800)
+    try {
+      await loadExportHtml(window, temporary)
+      await window.webContents.executeJavaScript(`Promise.race([Promise.all([...document.images].filter(image=>!image.complete).map(image=>new Promise(done=>{image.addEventListener('load',done,{once:true});image.addEventListener('error',done,{once:true})}))),new Promise(resolve=>setTimeout(resolve,10000))])`, true)
+      const contentHeight = await window.webContents.executeJavaScript(`Math.ceil(Math.max(document.body?.scrollHeight??0,document.documentElement?.scrollHeight??0))`, true) as number
+      const height = Math.max(200, Math.min(MAX_IMAGE_EXPORT_HEIGHT, contentHeight))
+      window.setContentSize(IMAGE_EXPORT_WIDTH, height)
+      // Give the resized hidden window a moment to relayout before capturing.
+      await window.webContents.executeJavaScript(`new Promise(resolve=>setTimeout(resolve,300))`, true)
+      const image = await window.webContents.capturePage()
+      const bytes = image.toPNG()
+      assertExportSize(bytes)
+      await atomicWrite(target, bytes)
+    } finally {
+      if (!window.isDestroyed()) window.destroy()
+      await rm(temporary, { force: true })
+    }
+    return { path: target }
   }
 
   private async render(
@@ -240,10 +308,10 @@ function rewriteKatexAssetUrls(css: string, katexPath: string, type: 'pdf' | 'ht
   })
 }
 
-function createExportWindow(): BrowserWindow {
+function createExportWindow(width = 1200, height = 800): BrowserWindow {
   const window = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width,
+    height,
     show: false,
     webPreferences: {
       sandbox: true,

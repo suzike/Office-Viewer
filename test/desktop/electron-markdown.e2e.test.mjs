@@ -24,6 +24,8 @@ test('desktop preserves the original Vditor Markdown UI, saves edits, loads loca
   const markdownPath = join(markdownDirectory, 'desktop-note.md')
   const wikiPath = join(markdownDirectory, 'Linked Note.md')
   const corruptPath = join(temporaryDirectory, 'invalid-utf8.markdown')
+  const badMermaidPath = join(markdownDirectory, 'bad-mermaid.md')
+  const linksPath = join(markdownDirectory, 'links.md')
   const markdownSource = [
     '# Original Vditor desktop gate',
     '',
@@ -53,6 +55,19 @@ test('desktop preserves the original Vditor Markdown UI, saves edits, loads loca
     writeFile(wikiPath, '# Linked page\n\nWiki navigation target.\n'),
     writeFile(markdownPath, markdownSource),
     writeFile(corruptPath, Buffer.from([0xff, 0xfe, 0x23, 0x20, 0x62, 0x61, 0x64])),
+    writeFile(badMermaidPath, ['# 坏图', '', '```mermaid', 'graph TD', '  A -> B', '```', ''].join('\n')),
+    writeFile(linksPath, [
+      '# 链接检查',
+      '',
+      '![存在的图片](./pixel.png)',
+      '',
+      '[缺失文档](assets/no-such-file.pdf)',
+      '',
+      '[外部](https://example.com) 和 [锚点](#链接检查)',
+      '',
+      '![缺失图片](images/gone.png)',
+      '',
+    ].join('\n')),
   ])
 
   const remoteDebuggingPort = await reservePort()
@@ -62,6 +77,8 @@ test('desktop preserves the original Vditor Markdown UI, saves edits, loads loca
     `--user-data-dir=${profileDirectory}`,
     applicationEntry,
     corruptPath,
+    badMermaidPath,
+    linksPath,
     markdownPath,
   ], {
     cwd: repositoryRoot,
@@ -112,21 +129,22 @@ test('desktop preserves the original Vditor Markdown UI, saves edits, loads loca
       viewportHeight: window.innerHeight,
     }
   })
-  assert.equal(chromeMetrics.titleHeight, 38)
-  assert.equal(chromeMetrics.menuHeight, 38, 'The application menus should share the compact title row.')
-  assert.equal(chromeMetrics.tabHeight, 34)
-  assert.equal(chromeMetrics.metadataHeight, 38)
-  assert.ok(chromeMetrics.documentTop <= 111, `Desktop chrome is too tall: ${chromeMetrics.documentTop}px`)
+  assert.equal(chromeMetrics.titleHeight, 40)
+  assert.equal(chromeMetrics.menuHeight, 40, 'The application menus should share the compact title row.')
+  assert.equal(chromeMetrics.tabHeight, 38)
+  assert.equal(chromeMetrics.metadataHeight, 44)
+  assert.ok(chromeMetrics.documentTop <= 146, `Desktop chrome is too tall: ${chromeMetrics.documentTop}px`)
   assert.ok(Math.abs(chromeMetrics.shellBottom - chromeMetrics.viewportHeight) <= 1, `Desktop shell does not fill the viewport: ${chromeMetrics.shellBottom}px / ${chromeMetrics.viewportHeight}px`)
   assert.ok(Math.abs(chromeMetrics.statusBottom - chromeMetrics.viewportHeight) <= 1, `Status bar is not anchored to the viewport bottom: ${chromeMetrics.statusBottom}px / ${chromeMetrics.viewportHeight}px`)
 
   await page.click('.menu-button')
   await page.waitForSelector('.menu-popover', { visible: true })
+  await new Promise((resolveDelay) => setTimeout(resolveDelay, 300)) // let the pop-in animation settle
   const menuPlacement = await page.$eval('.menu-popover', (menu) => {
     const bounds = menu.getBoundingClientRect()
     return { top: bounds.top, bottom: bounds.bottom, viewportHeight: window.innerHeight }
   })
-  assert.ok(menuPlacement.top >= 37 && menuPlacement.bottom <= menuPlacement.viewportHeight)
+  assert.ok(menuPlacement.top >= 35 && menuPlacement.bottom <= menuPlacement.viewportHeight)
   await page.click('.menu-button')
 
   let frame = await waitForMarkdownFrame(page)
@@ -202,6 +220,37 @@ test('desktop preserves the original Vditor Markdown UI, saves edits, loads loca
   assert.equal(advancedUi.desktopSettings, true)
   assert.equal(advancedUi.viewerSettings, true)
   assert.deepEqual(advancedUi.exportActions, ['exportPdf', 'exportPdfWithoutOutline', 'exportDocx', 'exportHtml'])
+
+  const batch2Ui = await frame.evaluate(() => ({
+    focusToggle: document.querySelector('[data-type="desktop-markdown-focus"]') !== null,
+    zenToggle: document.querySelector('[data-type="desktop-markdown-zen"]') !== null,
+    plainTextExport: document.querySelector('#context-menu [data-action="plainTextExport"]') !== null,
+    aiGenerateToc: document.querySelector('#context-menu [data-action="aiGenerateToc"]') !== null,
+    aiGenerateSummary: document.querySelector('#context-menu [data-action="aiGenerateSummary"]') !== null,
+  }))
+  assert.deepEqual(batch2Ui, {
+    focusToggle: true,
+    zenToggle: true,
+    plainTextExport: true,
+    aiGenerateToc: true,
+    aiGenerateSummary: true,
+  })
+
+  await frame.$eval('[data-type="desktop-markdown-focus"]', (button) => button.click())
+  await frame.waitForFunction(() => document.body.classList.contains('office-focus-mode'), { timeout: 10_000 })
+  await frame.click('.vditor-wysiwyg .vditor-wysiwyg__block')
+  await frame.waitForFunction(() => document.querySelector('.office-focus-current') !== null, { timeout: 10_000 })
+  await frame.$eval('[data-type="desktop-markdown-focus"]', (button) => button.click())
+  await frame.waitForFunction(() => !document.body.classList.contains('office-focus-mode'), { timeout: 10_000 })
+
+  await frame.$eval('[data-type="desktop-markdown-zen"]', (button) => button.click())
+  await frame.waitForFunction(() => (
+    document.body.classList.contains('office-zen-mode')
+    && getComputedStyle(document.querySelector('.vditor-toolbar')).display === 'none'
+  ), { timeout: 10_000 })
+  await frame.click('.vditor-wysiwyg')
+  await page.keyboard.press('Escape')
+  await frame.waitForFunction(() => !document.body.classList.contains('office-zen-mode'), { timeout: 10_000 })
 
   const secretGuard = await frame.evaluate(() => {
     const key = 'vditor-global-settings'
@@ -297,6 +346,31 @@ test('desktop preserves the original Vditor Markdown UI, saves edits, loads loca
   const plainPdf = await PDFDocument.load(await readFile(pdfExport.path))
   assert.equal(plainPdf.catalog.get(PDFName.of('Outlines')), undefined)
 
+  const textExport = await withTimeout(page.evaluate(
+    async ({ activeSession, source }) => window.officeDesktop.exportMarkdownText(activeSession, source),
+    { activeSession: sessionId, source: markdownSource },
+  ), 30_000, 'Markdown plain text export')
+  traceStep('plain text export complete')
+  assert.equal(textExport.path, join(markdownDirectory, 'desktop-note.txt'))
+  const exportedText = await readFile(textExport.path, 'utf8')
+  assert.match(exportedText, /Original Vditor desktop gate/)
+  assert.match(exportedText, /local pixel/)
+  assert.match(exportedText, /Linked Note/)
+  assert.match(exportedText, /graph TD/)
+  assert.doesNotMatch(exportedText, /^#{1,6} /m)
+  assert.doesNotMatch(exportedText, /!\[/)
+  assert.doesNotMatch(exportedText, /\[\[/)
+  assert.doesNotMatch(exportedText, /```/)
+  assert.doesNotMatch(exportedText, /<script>/)
+
+  await frame.click('.vditor-wysiwyg', { button: 'right' })
+  await frame.waitForSelector('#context-menu:not([hidden])')
+  await frame.click('#context-menu [data-action="aiGenerateToc"]')
+  await page.waitForSelector('.desktop-markdown-viewer__error', { timeout: 30_000 })
+  traceStep('AI generate without provider surfaced an error')
+  await page.click('.desktop-markdown-viewer__error .ant-alert-close-icon')
+  await page.waitForSelector('.desktop-markdown-viewer__error', { hidden: true })
+
   await frame.click('.vditor-wysiwyg')
   await page.keyboard.down('Control')
   await page.keyboard.press('End')
@@ -360,7 +434,7 @@ test('desktop preserves the original Vditor Markdown UI, saves edits, loads loca
   await page.waitForFunction(() => document.querySelector('.desktop-markdown-source') === null)
 
   await page.$eval('.document-tab.is-active .document-tab__close', (button) => button.click())
-  await page.waitForFunction(() => document.querySelectorAll('.document-tab').length === 1)
+  await page.waitForFunction(() => document.querySelectorAll('.document-tab').length === 3)
   await openInExistingInstance(profileDirectory, markdownPath)
   await page.waitForFunction((name) =>
     document.querySelector('.document-tab.is-active .document-tab__name')?.textContent === name,
@@ -373,6 +447,51 @@ test('desktop preserves the original Vditor Markdown UI, saves edits, loads loca
   frame = await waitForMarkdownFrame(page, 'imageBase=workspace')
   await frame.waitForSelector('.vditor-toolbar', { timeout: 30_000 })
   assert.notEqual(await frame.$('.vditor-wysiwyg'), null)
+
+  // 批次 3：死链扫描报告面板 + 点击定位
+  await activateTab(page, basename(linksPath))
+  frame = await waitForMarkdownFrame(page, 'imageBase=workspace')
+  await frame.waitForSelector('.vditor-wysiwyg', { timeout: 30_000 })
+  await frame.click('.vditor-wysiwyg', { button: 'right' })
+  await frame.waitForSelector('#context-menu:not([hidden])')
+  await frame.click('#context-menu [data-action="deadLinkScan"]')
+  await page.waitForSelector('.desktop-markdown-deadlinks .desktop-markdown-deadlinks__list li', { timeout: 30_000 })
+  const deadLinkRows = await page.$$eval('.desktop-markdown-deadlinks__list li', (rows) => rows.map((row) => row.textContent))
+  assert.equal(deadLinkRows.length, 2, `Unexpected dead-link report: ${JSON.stringify(deadLinkRows)}`)
+  assert.match(deadLinkRows[0], /第 5 行/)
+  assert.match(deadLinkRows[0], /assets\/no-such-file\.pdf/)
+  assert.match(deadLinkRows[0], /链接/)
+  assert.match(deadLinkRows[1], /第 9 行/)
+  assert.match(deadLinkRows[1], /images\/gone\.png/)
+  assert.match(deadLinkRows[1], /图片/)
+  traceStep('dead-link scan reported two missing references')
+  await page.click('.desktop-markdown-deadlinks__list li button')
+  await frame.waitForSelector('.office-dead-link-flash', { timeout: 10_000 })
+  traceStep('dead-link reveal flashed the reference in the editor')
+  await page.click('.desktop-markdown-deadlinks footer button')
+  await page.waitForSelector('.desktop-markdown-deadlinks', { hidden: true })
+
+  // 批次 3：从模板插入替换当前内容并标 dirty
+  await frame.$eval('[data-type="desktop-markdown-template"]', (button) => button.click())
+  await frame.waitForSelector('.office-template-panel', { timeout: 30_000 })
+  const templateNames = await frame.$$eval('.office-template-panel__item', (items) => items.map((item) => item.textContent))
+  assert.ok(templateNames.includes('会议纪要'), `Missing built-in template: ${JSON.stringify(templateNames)}`)
+  assert.ok(templateNames.includes('周报') && templateNames.includes('README'), `Missing built-in templates: ${JSON.stringify(templateNames)}`)
+  await frame.$$eval('.office-template-panel__item', (items) => items.find((item) => item.textContent === '会议纪要')?.click())
+  await frame.waitForFunction(() => document.querySelector('.vditor-wysiwyg')?.textContent?.includes('讨论要点'), { timeout: 15_000 })
+  await page.waitForSelector('.document-tab.is-active .dirty-dot')
+  await frame.$eval('[data-type="save"]', (button) => button.click())
+  await waitForFileText(linksPath, '## 讨论要点')
+  traceStep('template insertion replaced the document and saved')
+
+  // 批次 3：Mermaid 语法错误在渲染位置显示错误面板（含出错行）
+  await activateTab(page, basename(badMermaidPath))
+  frame = await waitForMarkdownFrame(page, 'imageBase=workspace')
+  await frame.waitForSelector('.language-mermaid.vditor-reset--error .office-mermaid-error', { timeout: 30_000 })
+  const mermaidError = await frame.$eval('.office-mermaid-error', (panel) => panel.textContent)
+  assert.match(mermaidError, /Mermaid 渲染失败（第 \d+ 行）/)
+  traceStep(`mermaid error panel shown: ${mermaidError.slice(0, 60)}`)
+
   assert.deepEqual(pageErrors, [], `Renderer page errors:\n${pageErrors.join('\n')}`)
   traceStep('test complete')
 })

@@ -45,3 +45,25 @@ test('Markdown DOCX export produces an Office Open XML package without launching
   assert.equal(bytes.subarray(0, 2).toString('ascii'), 'PK')
   assert.ok(bytes.byteLength > 1000)
 })
+
+test('Markdown plain text export writes stripped .txt next to the source document', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'office-markdown-text-'))
+  const documentPath = join(directory, 'Plain Note.md')
+  await writeFile(documentPath, '# placeholder')
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const markdown = [
+    '---', 'title: Plain', '---', '',
+    '# 标题', '', '一段 **加粗** 的[链接](https://example.com)文字。', '',
+    '```js', 'const a = 1;', '```', '', '- 列表项',
+  ].join('\n')
+
+  const result = await new MarkdownExportService(resolve('.')).exportText(documentPath, markdown)
+  assert.equal(result.path, join(directory, 'Plain Note.txt'))
+  const text = await readFile(result.path, 'utf8')
+  assert.equal(text, '标题\n\n一段 加粗 的链接文字。\n\nconst a = 1;\n\n列表项')
+
+  await assert.rejects(
+    () => new MarkdownExportService(resolve('.')).exportText(join(directory, 'not-markdown.txt'), '# hi'),
+    /Only Markdown documents can be exported/,
+  )
+})

@@ -62,3 +62,15 @@ export function DocumentIcon(props: IconProps) {
 export function CopyIcon(props: IconProps) {
   return <svg {...base} {...props}><rect x="8" y="8" width="11" height="11" /><path d="M16 8V5H5v11h3" /></svg>
 }
+
+export function DownloadIcon(props: IconProps) {
+  return <svg {...base} {...props}><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M4.5 19.5h15" /></svg>
+}
+
+export function RegenerateIcon(props: IconProps) {
+  return <svg {...base} {...props}><path d="M19 12a7 7 0 1 1-2.05-4.95M19 3.5V8h-4.5" /></svg>
+}
+
+export function EditIcon(props: IconProps) {
+  return <svg {...base} {...props}><path d="M14.5 4.5 19.5 9.5 8 21H3v-5zM12.5 6.5l5 5" /></svg>
+}

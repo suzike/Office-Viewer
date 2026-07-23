@@ -1,4 +1,4 @@
-import { getToolbar, bindShortcut, createContextMenu, setAIAvailable } from "./util.js";
+import { getToolbar, bindShortcut, createContextMenu, setAIAvailable, createWordCountChip, bindFileDrop, bindMermaidErrorPanel, revealDeadLink, showTemplatePanel, enableSaveButton } from "./util.js";
 import { mapVscodeLanguageToVditorLang } from "./lang.js";
 
 handler.on("open", async (md) => {
@@ -10,6 +10,7 @@ handler.on("open", async (md) => {
   if (isWeb) {
     document.body.classList.add('is-web')
   }
+  const updateWordCount = createWordCountChip();
   const editor = new Vditor('vditor', {
     value: content,
     cdn: rootPath,
@@ -31,7 +32,7 @@ handler.on("open", async (md) => {
     toolbar: await getToolbar(rootPath, () => {
       handler.emit('doSave', editor?.getValue());
       editor?.markSaved();
-    }),
+    }, () => editor),
     onAboutOpen: () => handler.emit('openAbout'),
     onSponsorLogoClick: () => handler.emit('openSponsor'),
     onSponsorSiteClick: () => handler.emit('openExternal', 'https://database-client.com/'),
@@ -83,6 +84,7 @@ handler.on("open", async (md) => {
     },
     input(content) {
       handler.emit("save", content)
+      updateWordCount(content)
     },
     upload: {
       url: '/image',
@@ -150,9 +152,27 @@ handler.on("open", async (md) => {
         }
         editor.setValue(content);
         editor.markSaved();
+        updateWordCount(content);
       })
       handler.on("insertImageMarkdown", (markdown) => {
         editor.insertMarkdown(markdown);
+      })
+      handler.on("insertGeneratedContent", (payload) => {
+        const content = typeof payload === 'string' ? payload : payload?.content;
+        if (!content || !content.trim()) return;
+        const value = editor.getValue();
+        const frontMatter = value.match(/^---[ \t]*\r?\n[\s\S]*?\n---[ \t]*\r?\n?/);
+        const insertAt = frontMatter ? frontMatter[0].length : 0;
+        const block = content.trim().replace(/\r\n/g, '\n');
+        editor.setValue(`${value.slice(0, insertAt)}${block}\n\n${value.slice(insertAt)}`);
+        handler.emit('save', editor.getValue());
+        enableSaveButton();
+      })
+      handler.on("markdownTemplates", (templates) => {
+        showTemplatePanel(Array.isArray(templates) ? templates : [], editor)
+      })
+      handler.on("revealDeadLink", (payload) => {
+        revealDeadLink(typeof payload === 'string' ? payload : payload?.target)
       })
       handler.on("gotoBlock", (fragment) => {
         if (fragment) {
@@ -179,8 +199,29 @@ handler.on("open", async (md) => {
       if (pendingFragment) {
         editor.scrollToBlock(pendingFragment);
       }
+      bindFileDrop(editor)
+      bindMermaidErrorPanel()
+      updateWordCount(editor.getValue());
     }
   })
   bindShortcut(handler, editor);
   createContextMenu(editor)
+  if (window.__officeDesktopMarkdown) {
+    // Desktop shell: forward text selections so the AI assistant can show its
+    // floating action bar (解释 / 翻译 / 引用到助手) next to the selection.
+    let selectionTimer = 0;
+    document.addEventListener('selectionchange', () => {
+      clearTimeout(selectionTimer);
+      selectionTimer = setTimeout(() => {
+        const selection = window.getSelection();
+        const text = selection ? String(selection).trim() : '';
+        let rect = null;
+        if (text && selection.rangeCount) {
+          const bounds = selection.getRangeAt(0).getBoundingClientRect();
+          rect = { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height };
+        }
+        handler.emit('assistantSelection', { text: text.slice(0, 16000), rect });
+      }, 150);
+    });
+  }
 }).emit("init")

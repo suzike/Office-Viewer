@@ -1,16 +1,22 @@
 import { Alert, Spin } from 'antd'
-import { lazy, Suspense, useLayoutEffect, useState } from 'react'
+import { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react'
 import type { DesktopFileSession } from '../../../desktop/shared/desktop-api'
 import {
   dispatchHostMessage,
   installOfficeHostBridge,
   type OfficeHostBridge,
+  type OfficeHostBridgeHandle,
 } from '../util/vscode'
 
 const ImageViewer = lazy(() => import('../view/image/Image'))
 
-export default function DesktopImageDocumentViewer({ session }: { session: DesktopFileSession }) {
+export default function DesktopImageDocumentViewer({ session, active = true }: { session: DesktopFileSession; active?: boolean }) {
   const [error, setError] = useState<string>()
+  const bridgeHandleRef = useRef<OfficeHostBridgeHandle>()
+
+  useLayoutEffect(() => {
+    if (active) bridgeHandleRef.current?.activate()
+  }, [active])
 
   useLayoutEffect(() => {
     let disposed = false
@@ -66,8 +72,10 @@ export default function DesktopImageDocumentViewer({ session }: { session: Deskt
     }
 
     const uninstall = installOfficeHostBridge(bridge)
+    bridgeHandleRef.current = uninstall
     return () => {
       disposed = true
+      bridgeHandleRef.current = undefined
       uninstall()
     }
   }, [session.id])

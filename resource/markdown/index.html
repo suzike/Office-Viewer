@@ -22,6 +22,18 @@
                 </span>
                 <span class="vditor-context-menu__label">AI Polish</span>
             </button>
+            <button class="vditor-context-menu__item vditor-context-menu__item--desktop-only" type="button" data-action="aiGenerateToc" role="menuitem">
+                <span class="vditor-context-menu__icon" aria-hidden="true">
+                    <span class="codicon codicon-list-tree"></span>
+                </span>
+                <span class="vditor-context-menu__label">AI 生成目录</span>
+            </button>
+            <button class="vditor-context-menu__item vditor-context-menu__item--desktop-only" type="button" data-action="aiGenerateSummary" role="menuitem">
+                <span class="vditor-context-menu__icon" aria-hidden="true">
+                    <span class="codicon codicon-symbol-text"></span>
+                </span>
+                <span class="vditor-context-menu__label">AI 生成摘要</span>
+            </button>
         </div>
         <div class="vditor-context-menu__separator" role="separator"></div>
         <div class="vditor-context-menu__group" role="group">
@@ -85,6 +97,37 @@
                     <span class="codicon codicon-code"></span>
                 </span>
                 <span class="vditor-context-menu__label">Export HTML</span>
+            </button>
+        </div>
+        <div class="vditor-context-menu__separator" role="separator"></div>
+        <div class="vditor-context-menu__group" role="group">
+            <button class="vditor-context-menu__item vditor-context-menu__item--desktop-only" type="button"
+                data-action="print" role="menuitem">
+                <span class="vditor-context-menu__icon" aria-hidden="true">
+                    <span class="codicon codicon-file-text"></span>
+                </span>
+                <span class="vditor-context-menu__label">打印</span>
+            </button>
+            <button class="vditor-context-menu__item vditor-context-menu__item--desktop-only" type="button"
+                data-action="longImageExport" role="menuitem">
+                <span class="vditor-context-menu__icon" aria-hidden="true">
+                    <span class="codicon codicon-device-camera"></span>
+                </span>
+                <span class="vditor-context-menu__label">导出长图</span>
+            </button>
+            <button class="vditor-context-menu__item vditor-context-menu__item--desktop-only" type="button"
+                data-action="plainTextExport" role="menuitem">
+                <span class="vditor-context-menu__icon" aria-hidden="true">
+                    <span class="codicon codicon-file-text"></span>
+                </span>
+                <span class="vditor-context-menu__label">导出纯文本</span>
+            </button>
+            <button class="vditor-context-menu__item vditor-context-menu__item--desktop-only" type="button"
+                data-action="deadLinkScan" role="menuitem">
+                <span class="vditor-context-menu__icon" aria-hidden="true">
+                    <span class="codicon codicon-link"></span>
+                </span>
+                <span class="vditor-context-menu__label">检查死链</span>
             </button>
         </div>
         <div class="vditor-context-menu__separator" role="separator"></div>
