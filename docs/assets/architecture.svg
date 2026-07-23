@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 492" width="960" height="492" font-family="-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#86868b"/>
+    </marker>
+    <marker id="arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0a84ff"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="960" height="492" rx="16" fill="#f5f5f7"/>
+
+  <!-- Left column: desktop pipeline -->
+  <g>
+    <rect x="40" y="24" width="560" height="52" rx="12" fill="#ffffff" stroke="#d2d2d7"/>
+    <text x="320" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="#1d1d1f">Windows 桌面壳 · Electron 主进程</text>
+    <text x="320" y="65" text-anchor="middle" font-size="11.5" fill="#6e6e73">原生窗口 / 文件关联 / 单实例 / 原子保存</text>
+  </g>
+  <line x1="320" y1="76" x2="320" y2="98" stroke="#86868b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <g>
+    <rect x="40" y="100" width="560" height="52" rx="12" fill="#ffffff" stroke="#d2d2d7"/>
+    <text x="320" y="122" text-anchor="middle" font-size="15" font-weight="600" fill="#1d1d1f">受限 IPC · 文件会话</text>
+    <text x="320" y="141" text-anchor="middle" font-size="11.5" fill="#6e6e73">会话令牌访问 / 路径穿越防护 / 上下文隔离</text>
+  </g>
+  <line x1="320" y1="152" x2="320" y2="174" stroke="#86868b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <g>
+    <rect x="40" y="176" width="560" height="52" rx="12" fill="#ffffff" stroke="#d2d2d7"/>
+    <text x="320" y="198" text-anchor="middle" font-size="15" font-weight="600" fill="#1d1d1f">React 多文档桌面界面</text>
+    <text x="320" y="217" text-anchor="middle" font-size="11.5" fill="#6e6e73">多标签工作区 / 深浅色主题 / Git History / 元数据栏</text>
+  </g>
+  <line x1="320" y1="228" x2="320" y2="250" stroke="#86868b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Renderer row: four boxes -->
+  <g font-size="13" font-weight="600" fill="#1d1d1f">
+    <rect x="40" y="252" width="128" height="56" rx="12" fill="#ffffff" stroke="#d2d2d7"/>
+    <text x="104" y="275" text-anchor="middle">Word / Excel</text>
+    <text x="104" y="293" text-anchor="middle" font-size="11" font-weight="400" fill="#6e6e73">PowerPoint</text>
+
+    <rect x="184" y="252" width="128" height="56" rx="12" fill="#ffffff" stroke="#d2d2d7"/>
+    <text x="248" y="275" text-anchor="middle">Markdown</text>
+    <text x="248" y="293" text-anchor="middle" font-size="11" font-weight="400" fill="#6e6e73">PDF / 电子书</text>
+
+    <rect x="328" y="252" width="128" height="56" rx="12" fill="#ffffff" stroke="#d2d2d7"/>
+    <text x="392" y="275" text-anchor="middle">图片 / 设计</text>
+    <text x="392" y="293" text-anchor="middle" font-size="11" font-weight="400" fill="#6e6e73">PSD / XMind / 字体</text>
+
+    <rect x="472" y="252" width="128" height="56" rx="12" fill="#ffffff" stroke="#d2d2d7"/>
+    <text x="536" y="275" text-anchor="middle">压缩包</text>
+    <text x="536" y="293" text-anchor="middle" font-size="11" font-weight="400" fill="#6e6e73">ZIP / RAR / 7Z</text>
+  </g>
+
+  <line x1="320" y1="308" x2="320" y2="330" stroke="#86868b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <g>
+    <rect x="40" y="332" width="560" height="52" rx="12" fill="#ffffff" stroke="#d2d2d7"/>
+    <text x="320" y="354" text-anchor="middle" font-size="15" font-weight="600" fill="#1d1d1f">解析 Worker · 有界 LRU 缓存</text>
+    <text x="320" y="373" text-anchor="middle" font-size="11.5" fill="#6e6e73">后台预解析 / 预热 / 内存上限保护</text>
+  </g>
+
+  <!-- Right column: AI assistant -->
+  <g>
+    <rect x="640" y="24" width="280" height="72" rx="12" fill="#0a84ff"/>
+    <text x="780" y="54" text-anchor="middle" font-size="15" font-weight="600" fill="#ffffff">AI 文档助手</text>
+    <text x="780" y="76" text-anchor="middle" font-size="11.5" fill="#d6e9ff">流式响应 / 快捷动作 / 敏感数据检测</text>
+  </g>
+  <line x1="780" y1="96" x2="780" y2="126" stroke="#0a84ff" stroke-width="1.5" marker-end="url(#arrow-accent)"/>
+
+  <g>
+    <rect x="640" y="128" width="280" height="60" rx="12" fill="#ffffff" stroke="#d2d2d7"/>
+    <text x="780" y="152" text-anchor="middle" font-size="14" font-weight="600" fill="#1d1d1f">文档上下文提取与缓存</text>
+    <text x="780" y="172" text-anchor="middle" font-size="11.5" fill="#6e6e73">主进程执行 · 路径 + mtime + 大小去重</text>
+  </g>
+  <line x1="780" y1="188" x2="780" y2="218" stroke="#0a84ff" stroke-width="1.5" marker-end="url(#arrow-accent)"/>
+
+  <g>
+    <rect x="640" y="220" width="280" height="108" rx="12" fill="#ffffff" stroke="#d2d2d7"/>
+    <text x="780" y="244" text-anchor="middle" font-size="14" font-weight="600" fill="#1d1d1f">模型提供器</text>
+    <text x="780" y="266" text-anchor="middle" font-size="11.5" fill="#6e6e73">Codex CLI · Claude Code · Ollama</text>
+    <text x="780" y="286" text-anchor="middle" font-size="11.5" fill="#6e6e73">OpenAI 兼容(DeepSeek / Kimi)</text>
+    <text x="780" y="306" text-anchor="middle" font-size="11.5" fill="#6e6e73">Anthropic · Google Gemini</text>
+  </g>
+
+  <!-- UI to assistant link -->
+  <line x1="600" y1="202" x2="652" y2="100" stroke="#0a84ff" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-accent)"/>
+
+  <!-- Security footnote -->
+  <g>
+    <rect x="40" y="412" width="880" height="52" rx="12" fill="#1d1d1f"/>
+    <text x="480" y="434" text-anchor="middle" font-size="12.5" font-weight="600" fill="#f5f5f7">安全边界</text>
+    <text x="480" y="453" text-anchor="middle" font-size="11.5" fill="#a1a1a6">禁用 Renderer Node 集成 · 会话令牌文件访问 · 压缩炸弹限制 · 私网模型显式授权 · 主动内容过滤 · 凭据脱敏</text>
+  </g>
+</svg>
